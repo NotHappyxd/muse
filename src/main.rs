@@ -6,11 +6,13 @@ mod cache;
 use std::cell::Cell;
 use ratatui::DefaultTerminal;
 use color_eyre::Result;
+use mpris::{PlayerFinder};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::watch;
 use watcher::{run_watcher, AppEvent};
 use crate::lyric::fetch_lyric;
 use crate::ui::state::{App, Song};
+use crate::watcher::PlayerCommand;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -41,6 +43,8 @@ fn run_ui(
 ) -> Result<()> {
 
     let mut app = App::new();
+
+    app.tx = Some(tx.clone());
 
     loop {
         while let Ok(event) = rx.try_recv() {
@@ -83,7 +87,10 @@ fn run_ui(
                     app.lyrics = lyrics;
                 }
 
-                AppEvent::Idle => {}
+                AppEvent::Idle => {},
+                AppEvent::PlayerCommand(command) => {
+                    handle_player_command(command)
+                }
             }
         }
 
@@ -108,4 +115,26 @@ fn run_ui(
     }
 
     Ok(())
+}
+
+fn handle_player_command(cmd: PlayerCommand) {
+    let finder = match PlayerFinder::new() {
+        Ok(f) => f,
+        Err(_) => return,
+    };
+
+    let player = finder
+        .iter_players()
+        .ok()
+        .and_then(|mut it| it.find_map(|p| p.ok()));
+
+    if let Some(player) = player {
+        match cmd {
+            PlayerCommand::Pause => { let _ = player.play_pause(); }
+            PlayerCommand::Next => { let _ = player.next(); }
+            PlayerCommand::Previous => {
+                let _ = player.previous();
+            }
+        }
+    }
 }
