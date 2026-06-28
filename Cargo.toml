@@ -1,0 +1,15 @@
+[package]
+name = "muse"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+mpris = "2.1.0"
+ratatui = "0.30.2"
+reqwest = { version = "0.13.4", features = ["query", "json"] }
+tokio = { version = "1.52.3", features = ["full"] }
+serde_json = "1.0.150"
+expanduser = "1.2.2"
+regex = "1.12.4"
