@@ -30,15 +30,19 @@ impl App {
 
         let ratio = if song_length == 0 { 0.0 } else { self.progress as f64 / (song_length * 1000) as f64 };
 
+        let [r, g, b] = self.song_theme;
+
+        let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from([r, g, b])};
+        let unfilled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(58) } else { Color::from([r / 3, g / 3, b / 3])};
         LineGauge::default()
             .label("")
             .filled_style(
                 Style::default()
-                    .fg(Color::Indexed(149))
+                    .fg(filled_style)
             )
             .unfilled_style(
                 Style::default()
-                    .fg(Color::Indexed(58))
+                    .fg(unfilled_style)
             )
             .ratio(ratio.clamp(0.0, 1.0))
             .render(gauge_area, buf);

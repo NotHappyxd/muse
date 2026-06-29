@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::{UnboundedSender};
 use tokio::sync::watch::Receiver;
 use crate::lyric::{LyricResponse};
+use crate::theme::fetch_theme;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -24,6 +25,9 @@ pub enum AppEvent {
         error: String,
     },
     PlayerCommand(PlayerCommand),
+    ThemeFetched {
+        rgb: [u8; 3],
+    },
 }
 
 #[derive(Debug)]
@@ -156,6 +160,13 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                             .length_in_microseconds()
                             .map(|us| (us / 1_000_000) as u32)
                             .unwrap_or(0);
+
+                        if let Some(art_url) = metadata.art_url().map(str::to_owned) {
+                            let tx2 = tx.clone();
+                            tokio::spawn(async move {
+                                let _ = fetch_theme(art_url, tx2).await;
+                            });
+                        }
 
                         let _ = tx.send(AppEvent::SongChanged { title, album: album.unwrap_or_else(|| "".to_string()), artists, length });
                     }

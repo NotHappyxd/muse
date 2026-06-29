@@ -15,10 +15,11 @@ pub struct Song {
 pub struct App {
     pub active_song: Option<Song>,
     pub lyrics: Option<LyricResponse>,
+    pub song_theme: [u8; 3],
     pub progress: u128,
     pub quit: bool,
     pub manual_scroll_offset: Cell<i16>,
-    pub tx: Option<UnboundedSender<AppEvent>>
+    pub tx: Option<UnboundedSender<AppEvent>>,
 }
 
 

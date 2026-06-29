@@ -2,6 +2,8 @@ mod ui;
 mod watcher;
 mod lyric;
 mod cache;
+mod kmeans;
+mod theme;
 
 use std::cell::Cell;
 use ratatui::DefaultTerminal;
@@ -26,7 +28,7 @@ async fn main() -> Result<()> {
         run_watcher(watcher_tx, shutdown_rx).await;
     });
 
-    let result = ratatui::run(|terminal| {
+    let result =  ratatui::run(|terminal| {
         run_ui(terminal, &mut rx, tx)
     });
 
@@ -67,6 +69,7 @@ fn run_ui(
                     });
 
                     app.active_song = Some(song);
+                    app.song_theme = [0, 0, 0];
                     app.lyrics = None;
                     app.manual_scroll_offset = Cell::new(0)
                 }
@@ -90,6 +93,9 @@ fn run_ui(
                 AppEvent::Idle => {},
                 AppEvent::PlayerCommand(command) => {
                     handle_player_command(command)
+                },
+                AppEvent::ThemeFetched { rgb } => {
+                    app.song_theme = rgb;
                 }
             }
         }
