@@ -14,20 +14,20 @@ pub struct LyricResponse {
     pub lyrics: Vec<LyricLine>
 }
 
-pub async fn fetch_lyric(song: &Song) -> Option<LyricResponse> {
-    if let Some(content) = find_cache(&song.title, &song.artists) {
+pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length: u32) -> Option<LyricResponse> {
+    if let Some(content) = find_cache(title, artists) {
         return Some(LyricResponse {
-            song: song.title.to_string(),
+            song: title.to_string(),
             lyrics: convert_to_timed(&content)
         });
     }
     let client = Client::new();
 
     let params = [
-        ("track_name", &song.title),
-        ("artist_name", &song.artists[0]),
-        ("album", if song.album.is_empty() { &song.title } else { &song.album }),
-        ("duration", &song.length.to_string()),
+        ("track_name", title),
+        ("artist_name", &artists[0]),
+        ("album", if album.is_empty() { title } else { album }),
+        ("duration", &length.to_string()),
     ];
 
     let str = match client
@@ -43,7 +43,7 @@ pub async fn fetch_lyric(song: &Song) -> Option<LyricResponse> {
 
     if str.is_empty() {
         return Some(LyricResponse {
-            song: song.title.clone(),
+            song: title.to_string(),
             lyrics: vec![]
         })
     }
@@ -54,16 +54,16 @@ pub async fn fetch_lyric(song: &Song) -> Option<LyricResponse> {
     if let Some(synced_lyrics) = json_data.get("syncedLyrics").and_then(|v| v.as_str()) {
         let lyrics = convert_to_timed(synced_lyrics);
 
-        cache::write_to_cache(&cache::cache_key(&song.title, &song.artists, &song.album), &synced_lyrics);
+        cache::write_to_cache(&cache::cache_key(title, artists, album), &synced_lyrics);
 
         return Some(LyricResponse {
-            song: song.title.to_string(),
+            song: title.to_string(),
             lyrics
         })
     }
 
     Some(LyricResponse {
-        song: song.title.to_string(),
+        song: title.to_string(),
         lyrics: vec![]
     })
 }

@@ -2,7 +2,7 @@ use mpris::{PlaybackStatus, PlayerFinder};
 use std::time::Duration;
 use tokio::sync::mpsc::{UnboundedSender};
 use tokio::sync::watch::Receiver;
-use crate::lyric::{LyricResponse};
+use crate::lyric::{fetch_lyric, LyricResponse};
 use crate::theme::fetch_theme;
 
 #[derive(Debug)]
@@ -27,6 +27,7 @@ pub enum AppEvent {
     PlayerCommand(PlayerCommand),
     ThemeFetched {
         rgb: [u8; 3],
+        accent: [u8; 3],
     },
 }
 
@@ -162,9 +163,16 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                             .unwrap_or(0);
 
                         if let Some(art_url) = metadata.art_url().map(str::to_owned) {
+                            let album_str = album.clone().unwrap_or_else(|| "".to_string());
+                            let artists_clone = Vec::clone(&artists);
+                            let title_clone = title.clone();
                             let tx2 = tx.clone();
                             tokio::spawn(async move {
-                                let _ = fetch_theme(art_url, tx2).await;
+                                let lyric_future = fetch_lyric(&title_clone, &artists_clone, &album_str, length);
+                                let theme_future = fetch_theme(art_url, &tx2);
+
+                                let (lyrics, _) = tokio::join!(lyric_future, theme_future);
+                                let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
                             });
                         }
 

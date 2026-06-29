@@ -34,6 +34,7 @@ impl App {
 
         let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from([r, g, b])};
         let unfilled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(58) } else { Color::from([r / 3, g / 3, b / 3])};
+
         LineGauge::default()
             .label("")
             .filled_style(
@@ -95,7 +96,7 @@ impl App {
             let style = if i < active_idx {
                 Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
             } else if i == active_idx {
-                Style::default().fg(Color::White).bold()
+                Style::default().fg(readable_accent(self.song_accent[0], self.song_accent[1], self.song_accent[2])).bold()
             } else {
                 Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
             };
@@ -140,4 +141,24 @@ fn format_second(second: u32) -> String {
     let minute = second / 60;
 
     format!("{}:{:02}", minute, second % 60)
+}
+
+fn readable_accent(r: u8, g: u8, b: u8) -> Color {
+    if r == 0 && g == 0 && b == 0 {
+        return Color::White;
+    }
+
+    let brightness = (r as f32 + g as f32 + b as f32) / 3.0;
+
+    let (r, g, b) = if brightness < 80.0 {
+        let boost = |c: u8| (c as f32 + (255.0 - c as f32) * 0.6) as u8;
+        (boost(r), boost(g), boost(b))
+    } else if brightness > 210.0 {
+        let dim = |c: u8| (c as f32 * 0.75) as u8;
+        (dim(r), dim(g), dim(b))
+    } else {
+        (r, g, b)
+    };
+
+    Color::Rgb(r, g, b)
 }

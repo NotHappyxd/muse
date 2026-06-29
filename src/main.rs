@@ -28,13 +28,15 @@ async fn main() -> Result<()> {
         run_watcher(watcher_tx, shutdown_rx).await;
     });
 
-    let result =  ratatui::run(|terminal| {
-        run_ui(terminal, &mut rx, tx)
-    });
+    let result = tokio::task::spawn_blocking(move || {
+        ratatui::run(|terminal| {
+            run_ui(terminal, &mut rx, tx)
+        });
+    }).await?;
 
     let _ = shutdown_tx.send(true);
 
-    result
+    Ok(result)
 }
 
 
@@ -59,17 +61,9 @@ fn run_ui(
                 } => {
                     let song = Song::new(title, album, artists, length);
 
-                    let song_clone = song.clone();
-                    let tx_clone = tx.clone();
-
-                    tokio::spawn(async move {
-                        let response = fetch_lyric(&song_clone).await;
-
-                        let _ = tx_clone.send(AppEvent::LyricsFetched { lyrics: response });
-                    });
-
                     app.active_song = Some(song);
                     app.song_theme = [0, 0, 0];
+                    app.song_accent = [0, 0, 0];
                     app.lyrics = None;
                     app.manual_scroll_offset = Cell::new(0)
                 }
@@ -94,8 +88,9 @@ fn run_ui(
                 AppEvent::PlayerCommand(command) => {
                     handle_player_command(command)
                 },
-                AppEvent::ThemeFetched { rgb } => {
+                AppEvent::ThemeFetched { rgb, accent } => {
                     app.song_theme = rgb;
+                    app.song_accent = rgb;
                 }
             }
         }
