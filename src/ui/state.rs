@@ -1,5 +1,7 @@
 use std::cell::Cell;
+use tokio::sync::mpsc::UnboundedSender;
 use crate::lyric::LyricResponse;
+use crate::watcher::AppEvent;
 
 #[derive(Debug, Clone)]
 pub struct Song {
@@ -16,6 +18,7 @@ pub struct App {
     pub progress: u128,
     pub quit: bool,
     pub manual_scroll_offset: Cell<i16>,
+    pub tx: Option<UnboundedSender<AppEvent>>
 }
 
 

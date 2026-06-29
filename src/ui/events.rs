@@ -2,6 +2,7 @@ use std::time::Duration;
 use crossterm::event;
 use crossterm::event::{KeyCode, KeyModifiers};
 use crate::ui::state::App;
+use crate::watcher::{AppEvent, PlayerCommand};
 
 impl App {
     pub(crate) fn handle_events(&mut self) -> color_eyre::Result<bool> {
@@ -25,6 +26,23 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.manual_scroll_offset.set(self.manual_scroll_offset.get().saturating_add(1));
                 },
+                KeyCode::Char(' ') => {
+                    if let Some(tx) = &self.tx {
+                        let _ = tx.send(AppEvent::PlayerCommand(PlayerCommand::Pause));
+                    }
+                },
+
+                KeyCode::Right => {
+                    if let Some(tx) = &self.tx {
+                        let _ = tx.send(AppEvent::PlayerCommand(PlayerCommand::Next));
+                    }
+                },
+
+                KeyCode::Left => {
+                    if let Some(tx) = &self.tx {
+                        let _ = tx.send(AppEvent::PlayerCommand(PlayerCommand::Previous));
+                    }
+                }
                 _ => {}
             }
         }
