@@ -1352,7 +1352,6 @@ dependencies = [
  "expanduser",
  "mpris",
  "ratatui",
- "regex",
  "reqwest",
  "serde_json",
  "tokio",

@@ -35,7 +35,9 @@ pub async fn fetch_lyric(song: &Song) -> Option<LyricResponse> {
         .query(&params)
         .send()
         .await {
-        Ok(res) => res.text().await.unwrap_or("".to_string()),
+        Ok(res) => {
+            res.text().await.unwrap_or("".to_string())
+        },
         Err(_) => "".to_string(),
     };
 

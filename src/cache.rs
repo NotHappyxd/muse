@@ -1,18 +1,15 @@
 use std::fs;
-use std::sync::OnceLock;
 use expanduser::expanduser;
-use regex::Regex;
 
 const CACHE_DIRECTORY: &'static str = "~/.cache/lyse";
-static NORMALIZE_RE: OnceLock<Regex> = OnceLock::new();
 
-pub fn cache_key(title: &str, artists: &Vec<String>, album: &str) -> String {
-    let re = NORMALIZE_RE.get_or_init(|| {
-        Regex::new(r"[^\w]+").unwrap()
-    });
-
+pub fn cache_key(title: &str, artists: &Vec<String>, _album: &str) -> String {
     let key = format!("{}-{}", title, artists.join("-"));
-    re.replace_all(&key.to_lowercase(), "").to_string()
+
+    key.to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
 }
 
 pub fn find_cache(title: &str, artists: &Vec<String>) -> Option<String> {
@@ -52,4 +49,11 @@ pub fn write_to_cache(key: &str, contents: &str) -> bool {
     }
 
     false
+}
+
+fn normalize(str: &str) -> String {
+    str.chars()
+        .flat_map(char::to_lowercase)
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect()
 }
