@@ -23,8 +23,15 @@ pub enum AppEvent {
     Error {
         error: String,
     },
+    PlayerCommand(PlayerCommand),
 }
 
+#[derive(Debug)]
+pub enum PlayerCommand {
+    Pause,
+    Next,
+    Previous
+}
 const POLL_MS: u64 = 500;
 
 struct WatcherState {
