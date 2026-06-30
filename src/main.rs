@@ -2,8 +2,8 @@ mod ui;
 mod watcher;
 mod lyric;
 mod cache;
-mod kmeans;
 mod theme;
+mod colorgen;
 
 use std::cell::Cell;
 use ratatui::DefaultTerminal;
@@ -12,7 +12,6 @@ use mpris::{PlayerFinder};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::watch;
 use watcher::{run_watcher, AppEvent};
-use crate::lyric::fetch_lyric;
 use crate::ui::state::{App, Song};
 use crate::watcher::PlayerCommand;
 
