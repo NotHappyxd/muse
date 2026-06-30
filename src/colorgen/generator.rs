@@ -1,6 +1,5 @@
 use image::DynamicImage;
 use crate::colorgen::conversions;
-use crate::colorgen::conversions::lab_to_rgb;
 use crate::colorgen::kmeans::{color_histogram, kmeans_recode, Cluster, Lab};
 
 pub struct Theme {
@@ -23,8 +22,8 @@ pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
         .unwrap();
 
     Theme {
-        main: readable_accent_lab(main.color),
-        accent: lab_to_rgb(accent.color)
+        main: readable_accent_lab(main.color, 15.0, 90.0),
+        accent: readable_accent_lab(accent.color, 45.0, 90.0)
     }
 }
 
@@ -37,15 +36,13 @@ fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_li
     chroma * contrast * size_weight * if account_light { lightness_diff } else { 1.0 }
 }
 
-pub fn readable_accent_lab(lab: Lab) -> [u8; 3] {
-    readable_accent([lab.l, lab.a, lab.b])
+pub fn readable_accent_lab(lab: Lab, min_l: f32, max_l: f32) -> [u8; 3] {
+    readable_accent([lab.l, lab.a, lab.b], min_l, max_l)
 }
 
-pub fn readable_accent(lab: [f32; 3]) -> [u8; 3] {
-    const MIN_L: f32 = 45.0; // floor: avoid colors too dark to read on dark bg
-    const MAX_L: f32 = 90.0; // ceiling: avoid near-white, low-contrast accents
+pub fn readable_accent(lab: [f32; 3], min_l: f32, max_l: f32) -> [u8; 3] {
 
-    let clamped = [lab[0].clamp(MIN_L, MAX_L), lab[1], lab[2]];
+    let clamped = [lab[0].clamp(min_l, max_l), lab[1], lab[2]];
 
     conversions::lab_arr_to_rgb(clamped)
 }

@@ -6,10 +6,7 @@ const CACHE_DIRECTORY: &'static str = "~/.cache/lyse";
 pub fn cache_key(title: &str, artists: &Vec<String>, _album: &str) -> String {
     let key = format!("{}-{}", title, artists.join("-"));
 
-    key.to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect()
+    normalize(&key)
 }
 
 pub fn find_cache(title: &str, artists: &Vec<String>) -> Option<String> {

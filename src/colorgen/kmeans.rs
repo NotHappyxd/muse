@@ -32,25 +32,29 @@ pub fn quantize_pixel(r: u8, g: u8, b: u8) -> usize {
 pub fn color_histogram(img: &DynamicImage) -> Vec<(Lab, f32)> {
     let mut bins: Vec<ColorBin> = vec![ColorBin::default(); BIN_COUNT];
 
-    for (_, _, pixel) in img.pixels() {
+    for (x, y, pixel) in img.pixels() {
         let rgb = pixel.0;
 
         let idx = quantize_pixel(rgb[0], rgb[1], rgb[2]);
-
         let bin = &mut bins[idx];
-
         let lab = conversions::rgb_to_lab([rgb[0], rgb[1], rgb[2]]);
 
-        bin.l_sum += lab.l;
-        bin.a_sum += lab.a;
-        bin.b_sum += lab.b;
-        bin.weight += 1.0;
+        let dx = (x as f32 + 0.5) / img.width() as f32 - 0.5;
+        let dy = (y as f32 + 0.5) / img.height() as f32 - 0.5;
+
+        let dist2 = dx * dx + dy * dy;
+
+        let weight = 0.75 + 0.25 * (-dist2 * 8.0).exp();
+
+        bin.l_sum += lab.l * weight;
+        bin.a_sum += lab.a * weight;
+        bin.b_sum += lab.b * weight;
+        bin.weight += weight;
     }
 
     bins.into_iter()
         .filter(|b| b.weight > 0.0)
         .map(|b| {
-
             (Lab {
                 l: b.l_sum / b.weight,
                 a: b.a_sum / b.weight,

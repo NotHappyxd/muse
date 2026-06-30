@@ -23,7 +23,7 @@ pub async fn fetch_theme(art_url: String, tx: &UnboundedSender<AppEvent>) {
         Err(_) => return,
     };
 
-    let theme = generator::generate_from_image(&img, true);
+    let theme = generator::generate_from_image(&img, false);
 
     let _ = tx.send(AppEvent::ThemeFetched {
         rgb: theme.main,

@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     });
 
     let result = tokio::task::spawn_blocking(move || {
-        ratatui::run(|terminal| {
+        let _ = ratatui::run(|terminal| {
             run_ui(terminal, &mut rx, tx)
         });
     }).await?;
@@ -75,7 +75,7 @@ fn run_ui(
 
                 AppEvent::PlayerDetached => {}
 
-                AppEvent::Error { error } => {
+                AppEvent::Error { error: _error } => {
 
                 }
 
