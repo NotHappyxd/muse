@@ -24,7 +24,7 @@ pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
 
     Theme {
         main: readable_accent_lab(main.color),
-        accent: readable_accent_lab(accent.color)
+        accent: lab_to_rgb(accent.color)
     }
 }
 
@@ -43,7 +43,7 @@ pub fn readable_accent_lab(lab: Lab) -> [u8; 3] {
 
 pub fn readable_accent(lab: [f32; 3]) -> [u8; 3] {
     const MIN_L: f32 = 45.0; // floor: avoid colors too dark to read on dark bg
-    const MAX_L: f32 = 115.0; // ceiling: avoid near-white, low-contrast accents
+    const MAX_L: f32 = 90.0; // ceiling: avoid near-white, low-contrast accents
 
     let clamped = [lab[0].clamp(MIN_L, MAX_L), lab[1], lab[2]];
 

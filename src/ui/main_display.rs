@@ -32,7 +32,7 @@ impl App {
 
         let [r, g, b] = self.song_theme;
 
-        let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from([r, g, b])};
+        let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from(self.song_theme)};
         let unfilled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(58) } else { Color::from([r / 3, g / 3, b / 3])};
 
         LineGauge::default()

@@ -89,7 +89,7 @@ fn run_ui(
                 },
                 AppEvent::ThemeFetched { rgb, accent } => {
                     app.song_theme = rgb;
-                    app.song_accent = rgb;
+                    app.song_accent = accent;
                 }
             }
         }
