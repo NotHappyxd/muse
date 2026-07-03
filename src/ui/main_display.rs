@@ -8,7 +8,8 @@ use crate::ui::state::App;
 
 impl App {
     pub(crate) fn render_gauge(&self, area: Rect, buf: &mut Buffer) {
-        let label = format_millis(self.progress);
+        let progress = self.current_progress();
+        let label = format_millis(progress);
 
         let layout = Layout::horizontal([
             Length(label.len() as u16),
@@ -28,7 +29,7 @@ impl App {
             None => 0
         };
 
-        let ratio = if song_length == 0 { 0.0 } else { self.progress as f64 / (song_length * 1000) as f64 };
+        let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
 
         let [r, g, b] = self.song_theme;
 
@@ -88,7 +89,7 @@ impl App {
             return;
         }
 
-        let current_ms = self.progress;
+        let current_ms = self.current_progress();
 
         let active_idx = synced_lyrics
             .iter()

@@ -67,10 +67,8 @@ fn run_ui(
                     app.manual_scroll_offset = Cell::new(0)
                 }
 
-                AppEvent::PositionChanged {
-                    progress,
-                } => {
-                    app.set_progress(progress);
+                AppEvent::PlaybackAnchor { position_ms, is_playing, at } => {
+                    app.set_progress(position_ms, is_playing, at)
                 }
 
                 AppEvent::PlayerDetached => {}

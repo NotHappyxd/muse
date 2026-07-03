@@ -1,9 +1,9 @@
-use mpris::{PlaybackStatus, PlayerFinder};
-use std::time::Duration;
-use tokio::sync::mpsc::{UnboundedSender};
-use tokio::sync::watch::Receiver;
-use crate::lyric::{fetch_lyric, LyricResponse};
+use crate::lyric::{LyricResponse, fetch_lyric};
 use crate::theme::fetch_theme;
+use mpris::{PlaybackStatus, PlayerFinder};
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::watch::Receiver;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -15,8 +15,10 @@ pub enum AppEvent {
         artists: Vec<String>,
         length: u32,
     },
-    PositionChanged {
-        progress: u128,
+    PlaybackAnchor {
+        position_ms: u128,
+        is_playing: bool,
+        at: Instant,
     },
     LyricsFetched {
         lyrics: Option<LyricResponse>,
@@ -35,7 +37,7 @@ pub enum AppEvent {
 pub enum PlayerCommand {
     Pause,
     Next,
-    Previous
+    Previous,
 }
 const POLL_MS: u64 = 500;
 
@@ -44,6 +46,9 @@ struct WatcherState {
     current_bus: Option<String>,
     current_album: Option<String>,
     album_retry: u32,
+    anchor_position: Option<u128>,
+    anchor_instant: Option<Instant>,
+    anchor_playing: bool,
 }
 
 pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receiver<bool>) {
@@ -51,7 +56,10 @@ pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receive
         current_title: None,
         current_bus: None,
         current_album: None,
-        album_retry: 0
+        album_retry: 0,
+        anchor_position: None,
+        anchor_instant: None,
+        anchor_playing: false,
     };
 
     loop {
@@ -84,9 +92,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
         .ok()
         .and_then(|mut it| {
             it.find(|p| {
-                p.as_ref()
-                    .ok()
-                    .and_then(|p| p.get_playback_status().ok())
+                p.as_ref().ok().and_then(|p| p.get_playback_status().ok())
                     == Some(PlaybackStatus::Playing)
             })
         })
@@ -100,11 +106,26 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                 state.current_album = None;
                 let _ = tx.send(AppEvent::PlayerDetached);
             }
+
+            if state.anchor_instant.is_some() || state.anchor_playing {
+                let estimated_position = predicted_position(state, Instant::now());
+                state.anchor_position = Some(estimated_position);
+                state.anchor_instant = None;
+                state.anchor_playing = false;
+
+                let _ = tx.send(AppEvent::PlaybackAnchor {
+                    position_ms: estimated_position,
+                    at: Instant::now(),
+                    is_playing: false,
+                });
+            }
+
             let _ = tx.send(AppEvent::Idle);
         }
 
         Some(player) => {
             let bus = player.bus_name().to_owned();
+            let new_session = state.anchor_position.is_none() && !state.anchor_playing;
 
             if state.current_bus.as_deref() != Some(&bus) {
                 if state.current_bus.is_some() {
@@ -115,9 +136,26 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                 state.current_album = None;
             }
 
-            if let Ok(pos) = player.get_position() {
-                let _ = tx.send(AppEvent::PositionChanged {
-                    progress: pos.as_millis(),
+            let now = Instant::now();
+            let (poll_ms, have_real_reading) = match player.get_position() {
+                Ok(pos) => (pos.as_millis(), true),
+                Err(e) => (predicted_position(state, now), false),
+            };
+
+            let drifted = have_real_reading && !new_session && {
+                let predicted = predicted_position(state, now);
+                (poll_ms as i128 - predicted as i128).abs() > 750
+            };
+
+            if new_session || drifted {
+                state.anchor_position = Some(poll_ms);
+                state.anchor_instant = Some(now);
+                state.anchor_playing = true;
+
+                let _ = tx.send(AppEvent::PlaybackAnchor {
+                    position_ms: poll_ms,
+                    is_playing: true,
+                    at: now,
                 });
             }
 
@@ -139,12 +177,14 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                     let different_title = state.current_title.as_ref() != Some(&title);
                     let valid_album = album.is_some();
 
-                    if (different_title && valid_album) || (different_title && !valid_album && state.album_retry >= 3) {
+                    if (different_title && valid_album)
+                        || (different_title && !valid_album && state.album_retry >= 3)
+                    {
                         state.current_title = Some(title.clone());
 
                         if !valid_album && state.album_retry >= 3 {
                             state.current_album = Some("".to_string());
-                        }else {
+                        } else {
                             state.current_album = album.clone();
                         }
 
@@ -168,7 +208,8 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                             let title_clone = title.clone();
                             let tx2 = tx.clone();
                             tokio::spawn(async move {
-                                let lyric_future = fetch_lyric(&title_clone, &artists_clone, &album_str, length);
+                                let lyric_future =
+                                    fetch_lyric(&title_clone, &artists_clone, &album_str, length);
                                 let theme_future = fetch_theme(art_url, &tx2);
 
                                 let (lyrics, _) = tokio::join!(lyric_future, theme_future);
@@ -176,7 +217,12 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                             });
                         }
 
-                        let _ = tx.send(AppEvent::SongChanged { title, album: album.unwrap_or_else(|| "".to_string()), artists, length });
+                        let _ = tx.send(AppEvent::SongChanged {
+                            title,
+                            album: album.unwrap_or_else(|| "".to_string()),
+                            artists,
+                            length,
+                        });
                     }
 
                     if different_title && !valid_album {
@@ -186,4 +232,18 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
             }
         }
     }
+}
+
+fn predicted_position(state: &WatcherState, now: Instant) -> u128 {
+    let Some(anchor_position) = state.anchor_position else {
+        return 0;
+    };
+
+    if state.anchor_playing {
+        if let Some(anchor_at) = state.anchor_instant {
+            return anchor_position + now.saturating_duration_since(anchor_at).as_millis();
+        }
+    }
+
+    anchor_position
 }
