@@ -1,5 +1,6 @@
 use image::DynamicImage;
 use crate::colorgen::conversions;
+use crate::colorgen::conversions::hsl_to_rgb;
 use crate::colorgen::kmeans::{color_histogram, kmeans_recode, Cluster, Lab};
 
 pub struct Theme {
@@ -7,7 +8,7 @@ pub struct Theme {
     pub accent: [u8; 3],
 }
 pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
-    let clusters = kmeans_recode(&color_histogram(&image), 6, 30);
+    let clusters = kmeans_recode(&color_histogram(&image), 12, 30);
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
@@ -21,9 +22,10 @@ pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
         })
         .unwrap();
 
+    let main_color = nudge_for_contrast(main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     Theme {
-        main: readable_accent_lab(main.color, 15.0, 90.0),
-        accent: readable_accent_lab(accent.color, 45.0, 90.0)
+        main: main_color,
+        accent: nudge_for_contrast(accent.color, main_color, 5.0, 0.3, 0.82)
     }
 }
 
@@ -36,13 +38,50 @@ fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_li
     chroma * contrast * size_weight * if account_light { lightness_diff } else { 1.0 }
 }
 
-pub fn readable_accent_lab(lab: Lab, min_l: f32, max_l: f32) -> [u8; 3] {
-    readable_accent([lab.l, lab.a, lab.b], min_l, max_l)
+// https://github.com/Harman1307/iris/blob/main/iris/generator.py#L125
+pub fn nudge_for_contrast(color: Lab, background_rgb: [u8; 3], target_ratio: f32, hard_min: f32, hard_max: f32) -> [u8; 3] {
+    let mut hsl = conversions::to_hsl(&color);
+    hsl[2] = hsl[2].clamp(hard_min, hard_max);
+
+    let darker = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
+
+    let step = 0.005 * if (darker) { -1.0 } else { 1.0 };
+
+    for _ in 0..130 {
+        let rgb = hsl_to_rgb(hsl);
+
+        if wcag_contrast(rgb, background_rgb) >= target_ratio {
+            return rgb;
+        }
+
+        hsl[2] += step;
+        
+        if darker && hsl[2] <= hard_min {
+            return hsl_to_rgb([hsl[0], hsl[1], hard_min]);
+        }
+
+        if !darker && hsl[2] > hard_max {
+            return hsl_to_rgb([hsl[0], hsl[1], hard_max]);
+        }
+    }
+
+    hsl_to_rgb(hsl)
 }
 
-pub fn readable_accent(lab: [f32; 3], min_l: f32, max_l: f32) -> [u8; 3] {
+fn luminance(rgb: [u8; 3]) -> f32 {
+    let [r, g, b] = rgb.map(|color| color as f32 / 255.0)
+        .map(|normal| if normal <= 0.03928 {
+            normal / 12.92
+        }else {
+            ((normal + 0.055) / 1.055).powf(2.4)
+        });
 
-    let clamped = [lab[0].clamp(min_l, max_l), lab[1], lab[2]];
+    0.2126 * r + 0.7152 * g + 0.0722 * b
+}
 
-    conversions::lab_arr_to_rgb(clamped)
+pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
+    let la = luminance(a);
+    let lb = luminance(b);
+    let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
+    (hi + 0.05) / (lo + 0.05)
 }

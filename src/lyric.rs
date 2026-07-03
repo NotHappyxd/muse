@@ -1,7 +1,6 @@
 use reqwest::Client;
 use crate::cache;
 use crate::cache::find_cache;
-use crate::ui::state::Song;
 
 #[derive(Debug, Clone)]
 pub struct LyricLine {

@@ -40,18 +40,6 @@ pub fn rgb_to_lab_arr(rgb: [u8; 3]) -> [f32; 3] {
     xyz_to_lab(x, y, z)
 }
 
-fn color_to_linear(channel: u8) -> f32 {
-    let mut linear = channel as f32 / 255.0;
-
-    if linear > 0.04045 {
-        linear = ((linear + 0.055) / 1.055).powf(2.4);
-    }else {
-        linear /= 12.92;
-    }
-
-    linear
-}
-
 fn xyz_to_lab(x: f32, y: f32, z: f32) -> [f32; 3] {
     // D65 reference white
     const XN: f32 = 0.95047;
@@ -78,22 +66,8 @@ fn lab_f(t: f32) -> f32 {
 }
 
 // -----
-pub fn lab_to_rgb(lab: Lab) -> [u8; 3] {
+pub fn lab_to_rgb(lab: &Lab) -> [u8; 3] {
     let (x, y, z) = lab_to_xyz([lab.l, lab.a, lab.b]);
-
-    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
-    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
-    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
-
-    [
-        linear_to_srgb(r),
-        linear_to_srgb(g),
-        linear_to_srgb(b),
-    ]
-}
-
-pub fn lab_arr_to_rgb(lab: [f32; 3]) -> [u8; 3] {
-    let (x, y, z) = lab_to_xyz(lab);
 
     let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
     let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
@@ -140,4 +114,71 @@ fn linear_to_srgb(v: f32) -> u8 {
     };
 
     (v.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+pub fn to_hsl(color: &Lab) -> [f32; 3] {
+    let rgb_normal = lab_to_rgb(&color)
+        .map(|color| color as f32 / 255.0);
+
+    let mut iter = rgb_normal.iter();
+    let first = *iter.next().unwrap();
+
+    let (min, max) = iter.fold((first, first), |(min, max), &x| {
+        (min.min(x), max.max(x))
+    });
+
+    let delta = max - min;
+
+    let l = (max + min) / 2.0;
+
+    if delta == 0.0 {
+        return [0.0, 0.0, l];
+    }
+
+    let s = delta / (1.0 - (2.0 * l - 1.0).abs());
+
+    let mut hue = if rgb_normal[0] == max {
+        (rgb_normal[1] - rgb_normal[2]) / (max - min)
+    }else if rgb_normal[1] == max {
+        2.0 + ((rgb_normal[2] - rgb_normal[0]) / (max - min))
+    }else {
+        4.0 + ((rgb_normal[0] - rgb_normal[1]) / (max - min))
+    };
+
+    if hue < 0.0 {
+        hue += 6.0;
+    }
+
+    hue *= 60.0;
+
+    [hue, s, l]
+}
+
+pub fn hsl_to_rgb(hsl: [f32; 3]) -> [u8; 3] {
+    let [h, s, l] = hsl;
+
+    if s == 0.0 {
+        let v = (l.clamp(0.0, 1.0) * 255.0).round() as u8;
+        return [v, v, v];
+    }
+
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let h_prime = h / 60.0;
+    let x = c * (1.0 - (h_prime % 2.0 - 1.0).abs());
+    let m = l - c / 2.0;
+
+    let (r1, g1, b1) = match h_prime as i32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    [
+        ((r1 + m).clamp(0.0, 1.0) * 255.0).round() as u8,
+        ((g1 + m).clamp(0.0, 1.0) * 255.0).round() as u8,
+        ((b1 + m).clamp(0.0, 1.0) * 255.0).round() as u8,
+    ]
 }
