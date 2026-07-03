@@ -5,10 +5,6 @@ use ratatui::widgets::Widget;
 use crate::ui::header::header;
 use crate::ui::state::App;
 
-pub fn render(app: &App, area: Rect, buf: &mut Buffer) {
-    app.render(area, buf);
-}
-
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::vertical([

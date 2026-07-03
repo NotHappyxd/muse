@@ -25,7 +25,7 @@ pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
     let main_color = nudge_for_contrast(main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     Theme {
         main: main_color,
-        accent: nudge_for_contrast(accent.color, main_color, 5.0, 0.3, 0.82)
+        accent: nudge_for_contrast(accent.color, main_color, 4.5, 0.35, 0.82)
     }
 }
 
@@ -45,7 +45,7 @@ pub fn nudge_for_contrast(color: Lab, background_rgb: [u8; 3], target_ratio: f32
 
     let darker = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
 
-    let step = 0.005 * if (darker) { -1.0 } else { 1.0 };
+    let step = 0.005 * if darker { -1.0 } else { 1.0 };
 
     for _ in 0..130 {
         let rgb = hsl_to_rgb(hsl);

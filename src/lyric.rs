@@ -47,7 +47,6 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
         })
     }
 
-
     let json_data: serde_json::Value = serde_json::from_str(&str).unwrap_or_default();
 
     if let Some(synced_lyrics) = json_data.get("syncedLyrics").and_then(|v| v.as_str()) {
