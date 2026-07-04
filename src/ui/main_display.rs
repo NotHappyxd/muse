@@ -3,7 +3,9 @@ use ratatui::layout::{Alignment, Layout, Rect};
 use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::prelude::Text;
 use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{LineGauge, Paragraph, Widget};
+use crate::lyric::LyricLine;
 use crate::ui::state::App;
 
 impl App {
@@ -99,16 +101,19 @@ impl App {
         let mut lines = Vec::new();
 
         for (i, lyric) in synced_lyrics.iter().enumerate() {
-            let style = if i < active_idx {
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
-            } else if i == active_idx {
-                Style::default().fg(accent).bold()
+            if i == active_idx {
+                lines.push(render_active_line(lyric, current_ms, accent));
             } else {
-                Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
-            };
+                let style = if i < active_idx {
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+                } else {
+                    Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
+                };
 
-            lines.push(ratatui::text::Line::from(lyric.line.clone()).style(style));
+                lines.push(Line::from(lyric.line.clone()).style(style));
+            }
         }
+
 
         let visible_height = area.height;
         let half_height = visible_height.saturating_sub(1) / 2;
@@ -137,6 +142,37 @@ impl App {
             .render(area, buf);
     }
 }
+
+fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color) -> Line<'a> {
+    if lyric.words.is_empty() {
+        return Line::from(lyric.line.clone())
+            .style(Style::default().fg(accent).bold());
+    }
+
+    let sung_style = Style::default().fg(accent).add_modifier(Modifier::DIM);
+    let current_style = Style::default().fg(accent).bold();
+    let upcoming_style = Style::default().fg(Color::Gray).add_modifier(Modifier::DIM);
+
+    let mut spans: Vec<Span> = Vec::with_capacity(lyric.words.len() * 2);
+
+    for (i, word) in lyric.words.iter().enumerate() {
+        let style = if current_ms >= word.end as u128 {
+            sung_style
+        } else if current_ms >= word.start as u128 {
+            current_style
+        } else {
+            upcoming_style
+        };
+
+        if i > 0 {
+            spans.push(Span::raw(" "));
+        }
+        spans.push(Span::styled(word.text.as_str(), style));
+    }
+
+    Line::from(spans)
+}
+
 
 fn format_millis(millis: u128) -> String {
     let second = millis / 1000;

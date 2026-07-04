@@ -1,12 +1,38 @@
+use std::path::Path;
 use reqwest::Client;
+use serde::Deserialize;
 use crate::cache;
 use crate::cache::find_cache;
+
+#[derive(Debug, Deserialize)]
+struct RawLine {
+    start: f64,
+    text: String,
+    words: Vec<RawWord>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawWord {
+    word: String,
+    start: f64,
+    end: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct Word {
+    pub text: String,
+    pub start: u64, // ms
+    pub end: u64,   // ms
+}
+
 
 #[derive(Debug, Clone)]
 pub struct LyricLine {
     pub timestamp: u64,
-    pub line: String
+    pub line: String,
+    pub words: Vec<Word>,
 }
+
 #[derive(Debug, Clone)]
 pub struct LyricResponse {
     pub song: String,
@@ -14,12 +40,17 @@ pub struct LyricResponse {
 }
 
 pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length: u32) -> Option<LyricResponse> {
+    if title.to_lowercase().contains("thousand") {
+        return parse_forced_alignment_file(Path::new("output.json"), title);
+    }
+
     if let Some(content) = find_cache(title, artists) {
         return Some(LyricResponse {
             song: title.to_string(),
             lyrics: convert_to_timed(&content)
         });
     }
+
     let client = Client::new();
 
     let params = [
@@ -66,6 +97,48 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
     })
 }
 
+pub fn parse_forced_alignment(json_str: &str, song_name: &str) -> Option<LyricResponse> {
+    let raw_lines: Vec<RawLine> = match serde_json::from_str(json_str) {
+        Ok(raw_lines) => raw_lines,
+        Err(_) => return None,
+    };
+
+    let lyrics = raw_lines
+        .into_iter()
+        .map(|raw| LyricLine {
+            timestamp: (raw.start * 1000.0).round() as u64,
+            line: raw.text,
+            words: raw
+                .words
+                .into_iter()
+                .map(|w| Word {
+                    text: w.word,
+                    start: (w.start * 1000.0).round() as u64,
+                    end: (w.end * 1000.0).round() as u64,
+                })
+                .collect(),
+        })
+        .collect();
+
+    Some(LyricResponse {
+        song: song_name.to_string(),
+        lyrics,
+    })
+}
+
+pub fn parse_forced_alignment_file(
+    path: impl AsRef<Path>,
+    song_name: &str,
+) -> Option<LyricResponse> {
+    let json_str = match std::fs::read_to_string(path) {
+        Ok(str) => str,
+        Err(_) => return None,
+    };
+
+    parse_forced_alignment(&json_str, song_name)
+}
+
+
 fn convert_to_timed(str: &str) -> Vec<LyricLine> {
     let mut lyrics: Vec<LyricLine> = Vec::new();
 
@@ -78,7 +151,8 @@ fn convert_to_timed(str: &str) -> Vec<LyricLine> {
             if let Some(timestamp) = parse_timestamp(time) {
                 lyrics.push(LyricLine {
                     timestamp,
-                    line: line_text
+                    line: line_text,
+                    words: Vec::new(),
                 });
             }
         }
