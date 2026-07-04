@@ -64,7 +64,7 @@ pub fn color_histogram(img: &DynamicImage) -> Vec<(Lab, f32)> {
         .collect()
 }
 
-pub(crate) fn kmeans_recode(
+pub(crate) fn kmeans(
     histogram: &[(Lab, f32)],
     k: usize,
     max_iterations: usize,

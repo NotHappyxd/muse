@@ -139,7 +139,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
             let now = Instant::now();
             let (poll_ms, have_real_reading) = match player.get_position() {
                 Ok(pos) => (pos.as_millis(), true),
-                Err(e) => (predicted_position(state, now), false),
+                Err(_) => (predicted_position(state, now), false),
             };
 
             let drifted = have_real_reading && !new_session && {

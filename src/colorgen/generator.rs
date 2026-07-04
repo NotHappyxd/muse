@@ -1,14 +1,14 @@
 use image::DynamicImage;
 use crate::colorgen::conversions;
 use crate::colorgen::conversions::hsl_to_rgb;
-use crate::colorgen::kmeans::{color_histogram, kmeans_recode, Cluster, Lab};
+use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster, Lab};
 
 pub struct Theme {
     pub main: [u8; 3],
     pub accent: [u8; 3],
 }
 pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
-    let clusters = kmeans_recode(&color_histogram(&image), 12, 30);
+    let clusters = kmeans(&color_histogram(&image), 12, 30);
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
@@ -44,28 +44,29 @@ pub fn nudge_for_contrast(color: Lab, background_rgb: [u8; 3], target_ratio: f32
     hsl[2] = hsl[2].clamp(hard_min, hard_max);
 
     let darker = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
+    let mut low = if darker { hard_min } else { hsl[2] };
+    let mut high = if darker { hsl[2] } else { hard_max };
 
-    let step = 0.005 * if darker { -1.0 } else { 1.0 };
-
-    for _ in 0..130 {
-        let rgb = hsl_to_rgb(hsl);
+    for _ in 0..12 {
+        let mid = (low + high) / 2.0;
+        let rgb = hsl_to_rgb([hsl[0], hsl[1], mid]);
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
-            return rgb;
-        }
-
-        hsl[2] += step;
-        
-        if darker && hsl[2] <= hard_min {
-            return hsl_to_rgb([hsl[0], hsl[1], hard_min]);
-        }
-
-        if !darker && hsl[2] > hard_max {
-            return hsl_to_rgb([hsl[0], hsl[1], hard_max]);
+            if darker {
+                low = mid;
+            }else {
+                high = mid;
+            }
+        }else {
+            if darker {
+                high = mid;
+            }else {
+                low = mid;
+            }
         }
     }
 
-    hsl_to_rgb(hsl)
+    hsl_to_rgb([hsl[0], hsl[1], if darker { low } else { high }])
 }
 
 fn luminance(rgb: [u8; 3]) -> f32 {

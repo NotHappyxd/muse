@@ -16,7 +16,7 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 fastrand = "2.4.1"
 
 [profile.release]
-opt-level = "z"
+opt-level = "s"
 lto = "fat"
 codegen-units = 1
 strip = true
