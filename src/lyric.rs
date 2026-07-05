@@ -40,7 +40,7 @@ pub struct LyricResponse {
 }
 
 pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length: u32) -> Option<LyricResponse> {
-    if title.to_lowercase().contains("thousand") {
+    if title.to_lowercase().contains("a thousand years") && !artists.is_empty() && artists[0].contains("John Michael Howell") { // Test on A Thousand Years
         return parse_forced_alignment_file(Path::new("output.json"), title);
     }
 
