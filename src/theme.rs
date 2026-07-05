@@ -46,23 +46,3 @@ async fn fetch_art_bytes(art_url: &str) -> Result<Vec<u8>, String> {
             .map_err(|e| format!("Failed to read art bytes: {e}"))
     }
 }
-
-/*
-
-fn is_usable_color(c: &Color) -> bool {
-    let brightness = (c.r + c.g + c.b) / 3.0;
-    if brightness < 30.0 || brightness > 230.0 {
-        return false;
-    }
-    let max = c.r.max(c.g).max(c.b);
-    let min = c.r.min(c.g).min(c.b);
-    let saturation = if max > 0.0 { (max - min) / max } else { 0.0 };
-    saturation > 0.15
-}
-
-fn saturation(c: &Color) -> f32 {
-    let max = c.r.max(c.g).max(c.b);
-    let min = c.r.min(c.g).min(c.b);
-    if max > 0.0 { (max - min) / max } else { 0.0 }
-}
-*/

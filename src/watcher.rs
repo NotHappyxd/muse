@@ -40,6 +40,7 @@ pub enum PlayerCommand {
     Previous,
 }
 const POLL_MS: u64 = 500;
+const MAXIMUM_DRIFT_ALLOWED: i128 = 750;
 
 struct WatcherState {
     current_title: Option<String>,
@@ -144,7 +145,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
 
             let drifted = have_real_reading && !new_session && {
                 let predicted = predicted_position(state, now);
-                (poll_ms as i128 - predicted as i128).abs() > 750
+                (poll_ms as i128 - predicted as i128).abs() > MAXIMUM_DRIFT_ALLOWED
             };
 
             if new_session || drifted {
