@@ -25,7 +25,7 @@ pub struct PartialConfig {
 }
 
 impl Default for Config {
-    fn default() -> Self{
+    fn default() -> Self {
         Config {
             header: String::from("{title} {artists} - {album}"),
             header_centered: false,
