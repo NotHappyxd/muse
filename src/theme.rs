@@ -2,7 +2,7 @@ use crate::watcher::AppEvent;
 use tokio::sync::mpsc::UnboundedSender;
 use crate::colorgen::generator;
 
-pub async fn fetch_theme(art_url: String, tx: &UnboundedSender<AppEvent>) {
+pub async fn fetch_theme(art_url: String, tx: &UnboundedSender<AppEvent>, k_clusters: u8, max_iterations: u8) {
     let bytes = match fetch_art_bytes(&art_url).await {
         Ok(bytes) => bytes,
         Err(_) => return,
@@ -23,7 +23,10 @@ pub async fn fetch_theme(art_url: String, tx: &UnboundedSender<AppEvent>) {
         Err(_) => return,
     };
 
-    let theme = generator::generate_from_image(&img, false);
+    let theme = generator::generate_from_image(&img, 
+                                               k_clusters as usize, 
+                                               max_iterations as usize,
+                                               false);
 
     let _ = tx.send(AppEvent::ThemeFetched {
         rgb: theme.main,
@@ -46,23 +49,3 @@ async fn fetch_art_bytes(art_url: &str) -> Result<Vec<u8>, String> {
             .map_err(|e| format!("Failed to read art bytes: {e}"))
     }
 }
-
-/*
-
-fn is_usable_color(c: &Color) -> bool {
-    let brightness = (c.r + c.g + c.b) / 3.0;
-    if brightness < 30.0 || brightness > 230.0 {
-        return false;
-    }
-    let max = c.r.max(c.g).max(c.b);
-    let min = c.r.min(c.g).min(c.b);
-    let saturation = if max > 0.0 { (max - min) / max } else { 0.0 };
-    saturation > 0.15
-}
-
-fn saturation(c: &Color) -> f32 {
-    let max = c.r.max(c.g).max(c.b);
-    let min = c.r.min(c.g).min(c.b);
-    if max > 0.0 { (max - min) / max } else { 0.0 }
-}
-*/

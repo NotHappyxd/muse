@@ -4,6 +4,7 @@ mod lyric;
 mod cache;
 mod theme;
 mod colorgen;
+mod config;
 
 use std::cell::Cell;
 use ratatui::DefaultTerminal;
@@ -12,24 +13,27 @@ use mpris::{PlayerFinder};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::watch;
 use watcher::{run_watcher, AppEvent};
+use crate::config::Config;
 use crate::ui::state::{App, Song};
 use crate::watcher::PlayerCommand;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let config = config::init();
     color_eyre::install()?;
 
     let (tx, mut rx) = unbounded_channel();
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let watcher_tx = tx.clone();
+    let config_clone = config.clone();
     tokio::spawn(async move {
-        run_watcher(watcher_tx, shutdown_rx).await;
+        run_watcher(watcher_tx, shutdown_rx, &config_clone).await;
     });
 
     let result = tokio::task::spawn_blocking(move || {
         let _ = ratatui::run(|terminal| {
-            run_ui(terminal, &mut rx, tx)
+            run_ui(terminal, &mut rx, tx, config)
         });
     }).await?;
 
@@ -43,9 +47,10 @@ fn run_ui(
     terminal: &mut DefaultTerminal,
     rx: &mut tokio::sync::mpsc::UnboundedReceiver<AppEvent>,
     tx: UnboundedSender<AppEvent>,
+    config: Config
 ) -> Result<()> {
 
-    let mut app = App::new();
+    let mut app = App::new(config);
 
     app.tx = Some(tx.clone());
 

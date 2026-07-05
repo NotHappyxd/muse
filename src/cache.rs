@@ -1,7 +1,7 @@
 use std::fs;
 use expanduser::expanduser;
 
-const CACHE_DIRECTORY: &'static str = "~/.cache/lyse";
+const CACHE_DIRECTORY: &'static str = "~/.cache/muse";
 
 pub fn cache_key(title: &str, artists: &Vec<String>, _album: &str) -> String {
     let key = format!("{}-{}", title, artists.join("-"));

@@ -7,8 +7,8 @@ pub struct Theme {
     pub main: [u8; 3],
     pub accent: [u8; 3],
 }
-pub fn generate_from_image(image: &DynamicImage, account_light: bool) -> Theme {
-    let clusters = kmeans(&color_histogram(&image), 12, 30);
+pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iterations: usize, account_light: bool) -> Theme {
+    let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 

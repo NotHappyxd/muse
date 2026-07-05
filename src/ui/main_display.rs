@@ -5,6 +5,7 @@ use ratatui::prelude::Text;
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{LineGauge, Paragraph, Widget};
+use crate::config::Config;
 use crate::lyric::LyricLine;
 use crate::ui::state::App;
 
@@ -102,7 +103,7 @@ impl App {
 
         for (i, lyric) in synced_lyrics.iter().enumerate() {
             if i == active_idx {
-                lines.push(render_active_line(lyric, current_ms, accent));
+                lines.push(render_active_line(lyric, current_ms, accent, &self.config));
             } else {
                 let style = if i < active_idx {
                     Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
@@ -113,7 +114,6 @@ impl App {
                 lines.push(Line::from(lyric.line.clone()).style(style));
             }
         }
-
 
         let visible_height = area.height;
         let half_height = visible_height.saturating_sub(1) / 2;
@@ -143,9 +143,10 @@ impl App {
     }
 }
 
-fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color) -> Line<'a> {
+fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color, config: &'a Config) -> Line<'a> {
     if lyric.words.is_empty() {
-        return Line::from(lyric.line.clone())
+        let text = [config.active_lyric_prefix.as_str(), lyric.line.as_str()].concat();
+        return Line::from(text)
             .style(Style::default().fg(accent).bold());
     }
 
@@ -153,7 +154,7 @@ fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color)
     let current_style = Style::default().fg(accent).bold();
     let upcoming_style = Style::default().fg(Color::Gray).add_modifier(Modifier::DIM);
 
-    let mut spans: Vec<Span> = Vec::with_capacity(lyric.words.len() * 2);
+    let mut spans: Vec<Span> = Vec::with_capacity(lyric.words.len() * 2 + 1);
 
     let active_idx = lyric.words.iter()
         .rposition(|word| word.start as u128 <= current_ms)
@@ -163,7 +164,11 @@ fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color)
         let style = if i < active_idx {
             sung_style
         } else if i == active_idx {
-            current_style
+            if word.end as u128 + 30 <= current_ms {
+                sung_style
+            }else {
+                current_style
+            }
         } else {
             upcoming_style
         };
@@ -171,9 +176,11 @@ fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color)
         if i > 0 {
             spans.push(Span::raw(" "));
         }
+
         spans.push(Span::styled(word.text.as_str(), style));
     }
 
+    spans.insert(0, Span::styled(config.active_lyric_prefix.as_str(), current_style));
     Line::from(spans)
 }
 

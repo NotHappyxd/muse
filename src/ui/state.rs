@@ -1,6 +1,7 @@
 use std::cell::Cell;
 use std::time::Instant;
 use tokio::sync::mpsc::UnboundedSender;
+use crate::config::Config;
 use crate::lyric::LyricResponse;
 use crate::watcher::AppEvent;
 
@@ -24,6 +25,7 @@ pub struct App {
     pub quit: bool,
     pub manual_scroll_offset: Cell<i16>,
     pub tx: Option<UnboundedSender<AppEvent>>,
+    pub config: Config
 }
 
 
@@ -39,8 +41,20 @@ impl Song {
 }
 
 impl App {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(config: Config) -> Self {
+        Self {
+            active_song: None,
+            lyrics: None,
+            song_theme: [0, 0, 0],
+            song_accent: [0, 0, 0],
+            anchor_position: 0,
+            anchor_instant: None,
+            is_playing: false,
+            quit: false,
+            manual_scroll_offset: Cell::new(0),
+            tx: None,
+            config,
+        }
     }
 
     pub fn set_progress(&mut self, position: u128, is_playing: bool, at: Instant) {

@@ -6,13 +6,23 @@ use crate::ui::state::App;
 
 pub fn header(area: Rect, buf: &mut Buffer, app: &App) {
     let text = match app.active_song.as_ref() {
-        Some(song) => format!(" {} - {} ({})", song.title, song.artists[0], song.album),
-        None => "Cannot detect song!".to_string()
+        Some(song) => {
+            let raw_header = app.config.header.replace("{title}", &song.title)
+                .replace("{artists}", &song.artists[0])
+                .replace("{album}", &song.album);
+
+            raw_header
+        },
+        None => String::from("Cannot detect song!")
     };
 
-    let header = Paragraph::new(text)
+    let mut header = Paragraph::new(text)
         .bold()
         .left_aligned();
+
+    if app.config.header_centered {
+        header = header.centered()
+    }
 
     header.render(area, buf);
 }
