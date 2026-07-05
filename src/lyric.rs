@@ -35,9 +35,9 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
         .send()
         .await {
         Ok(res) => {
-            res.text().await.unwrap_or("".to_string())
+            res.text().await.unwrap_or(String::from(""))
         },
-        Err(_) => "".to_string(),
+        Err(_) => String::from(""),
     };
 
     if str.is_empty() {

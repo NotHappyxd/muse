@@ -32,9 +32,18 @@ impl App {
         let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
 
         let [r, g, b] = self.song_theme;
+        let blank = r == 0 && g == 0 && b == 0;
 
-        let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from(self.song_theme)};
-        let unfilled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(58) } else { Color::from([r / 3, g / 3, b / 3])};
+        let filled_style = if blank {
+            Color::Indexed(149)
+        } else {
+            Color::from(self.song_theme)
+        };
+        let unfilled_style = if blank {
+            Color::Indexed(58)
+        } else {
+            Color::from([r / 3, g / 3, b / 3])
+        };
 
         LineGauge::default()
             .label("")
@@ -62,10 +71,15 @@ impl App {
         };
 
         let accent = Color::from(self.song_accent);
+        let alignment = if self.config.center_lyrics {
+            Alignment::Center
+        }else {
+            Alignment::Left
+        };
 
         let Some(lyrics) = &self.lyrics else {
             Text::from("Fetching lyrics...")
-                .centered()
+                .alignment(alignment)
                 .style(Style::default().fg(accent))
                 .render(area, buf);
             return;
@@ -73,7 +87,7 @@ impl App {
 
         if &lyrics.song != &active_song.title {
             Paragraph::new("Fetching lyrics...")
-                .centered()
+                .alignment(alignment)
                 .style(Style::default().fg(accent))
                 .render(area, buf);
             return;
@@ -83,7 +97,7 @@ impl App {
 
         if synced_lyrics.is_empty() {
             Paragraph::new("No synchronized lyrics found.")
-                .centered()
+                .alignment(alignment)
                 .style(Style::default().fg(accent))
                 .render(area, buf);
             return;
@@ -99,15 +113,19 @@ impl App {
         let mut lines = Vec::new();
 
         for (i, lyric) in synced_lyrics.iter().enumerate() {
+            let mut text = lyric.line.clone();
+
             let style = if i < active_idx {
                 Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
             } else if i == active_idx {
+                text.insert_str(0, &self.config.active_lyric_prefix);
+
                 Style::default().fg(accent).bold()
             } else {
                 Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
             };
 
-            lines.push(ratatui::text::Line::from(lyric.line.clone()).style(style));
+            lines.push(ratatui::text::Line::from(text).style(style));
         }
 
         let visible_height = area.height;
@@ -132,7 +150,7 @@ impl App {
         self.manual_scroll_offset.set(offset);
 
         Paragraph::new(lines)
-            .alignment(Alignment::Center)
+            .alignment(alignment)
             .scroll((final_scroll as u16, 0))
             .render(area, buf);
     }

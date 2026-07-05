@@ -4,6 +4,7 @@ use mpris::{PlaybackStatus, PlayerFinder};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
+use crate::config::Config;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -52,7 +53,7 @@ struct WatcherState {
     anchor_playing: bool,
 }
 
-pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receiver<bool>) {
+pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receiver<bool>, config: &Config) {
     let mut state = WatcherState {
         current_title: None,
         current_bus: None,
@@ -71,13 +72,13 @@ pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receive
                 }
             }
             _ = tokio::time::sleep(Duration::from_millis(POLL_MS)) => {
-                poll(&tx, &mut state);
+                poll(&tx, &mut state, config);
             }
         }
     }
 }
 
-fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
+fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Config) {
     let finder = match PlayerFinder::new() {
         Ok(f) => f,
         Err(e) => {
@@ -91,13 +92,16 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
     let active = finder
         .iter_players()
         .ok()
-        .and_then(|mut it| {
-            it.find(|p| {
-                p.as_ref().ok().and_then(|p| p.get_playback_status().ok())
-                    == Some(PlaybackStatus::Playing)
-            })
-        })
-        .and_then(|p| p.ok());
+        .and_then(|it| {
+            it.filter_map(Result::ok)
+                .find(|p| {
+                    let playing = p.get_playback_status().ok()
+                        .map(|playback| playback == PlaybackStatus::Playing)
+                        .unwrap_or(false);
+
+                    playing && p.bus_name().contains(&config.player)
+                })
+        });
 
     match active {
         None => {
@@ -184,7 +188,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                         state.current_title = Some(title.clone());
 
                         if !valid_album && state.album_retry >= 3 {
-                            state.current_album = Some("".to_string());
+                            state.current_album = Some(String::from(""));
                         } else {
                             state.current_album = album.clone();
                         }
@@ -204,14 +208,18 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
                             .unwrap_or(0);
 
                         if let Some(art_url) = metadata.art_url().map(str::to_owned) {
-                            let album_str = album.clone().unwrap_or_else(|| "".to_string());
+                            let album_str = album.clone().unwrap_or_else(|| String::from(""));
                             let artists_clone = Vec::clone(&artists);
                             let title_clone = title.clone();
                             let tx2 = tx.clone();
+
+                            let k_clusters = config.k_clusters;
+                            let max_iterations = config.max_color_gen_iterations;
+
                             tokio::spawn(async move {
                                 let lyric_future =
                                     fetch_lyric(&title_clone, &artists_clone, &album_str, length);
-                                let theme_future = fetch_theme(art_url, &tx2);
+                                let theme_future = fetch_theme(art_url, &tx2, k_clusters, max_iterations);
 
                                 let (lyrics, _) = tokio::join!(lyric_future, theme_future);
                                 let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
@@ -220,7 +228,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState) {
 
                         let _ = tx.send(AppEvent::SongChanged {
                             title,
-                            album: album.unwrap_or_else(|| "".to_string()),
+                            album: album.unwrap_or_else(|| String::from("")),
                             artists,
                             length,
                         });
