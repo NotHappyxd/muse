@@ -155,10 +155,14 @@ fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color)
 
     let mut spans: Vec<Span> = Vec::with_capacity(lyric.words.len() * 2);
 
+    let active_idx = lyric.words.iter()
+        .rposition(|word| word.start as u128 <= current_ms)
+        .unwrap_or(0);
+
     for (i, word) in lyric.words.iter().enumerate() {
-        let style = if current_ms >= word.end as u128 {
+        let style = if i < active_idx {
             sung_style
-        } else if current_ms >= word.start as u128 {
+        } else if i == active_idx {
             current_style
         } else {
             upcoming_style
