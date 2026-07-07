@@ -35,9 +35,10 @@ impl App {
         let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
 
         let [r, g, b] = self.song_theme;
+        let waiting = r == 0 && g == 0 && b == 0 && self.config.color.generate;
 
-        let filled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(149) } else { Color::from(self.song_theme)};
-        let unfilled_style = if r == 0 && b == 0 && g == 0 { Color::Indexed(58) } else { Color::from([r / 3, g / 3, b / 3])};
+        let filled_style = if waiting { Color::from(self.config.color.fallback_main_rgb()) } else { Color::from(self.song_theme)};
+        let unfilled_style = if waiting { Color::from(self.config.color.fallback_accent_rgb()) } else { Color::from([r / 3, g / 3, b / 3])};
 
         LineGauge::default()
             .label("")
@@ -136,8 +137,14 @@ impl App {
 
         self.manual_scroll_offset.set(offset);
 
+        let alignmnet = if self.config.lyric_settings.center { 
+            Alignment::Center
+        }else {
+            Alignment::Left
+        };
+        
         Paragraph::new(lines)
-            .alignment(Alignment::Center)
+            .alignment(alignmnet)
             .scroll((final_scroll as u16, 0))
             .render(area, buf);
     }
@@ -145,7 +152,7 @@ impl App {
 
 fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color, config: &'a Config) -> Line<'a> {
     if lyric.words.is_empty() {
-        let text = [config.active_lyric_prefix.as_str(), lyric.line.as_str()].concat();
+        let text = [config.lyric_settings.active_prefix.as_str(), lyric.line.as_str()].concat();
         return Line::from(text)
             .style(Style::default().fg(accent).bold());
     }
@@ -180,7 +187,7 @@ fn render_active_line<'a>(lyric: &'a LyricLine, current_ms: u128, accent: Color,
         spans.push(Span::styled(word.text.as_str(), style));
     }
 
-    spans.insert(0, Span::styled(config.active_lyric_prefix.as_str(), current_style));
+    spans.insert(0, Span::styled(config.lyric_settings.active_prefix.as_str(), current_style));
     Line::from(spans)
 }
 

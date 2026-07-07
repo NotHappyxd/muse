@@ -1,53 +1,78 @@
 use std::fs;
+use crossterm::style::Colors;
 use expanduser::expanduser;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct Config {
-    pub header: String,
-    pub header_centered: bool,
-    pub k_clusters: u8,
-    pub max_color_gen_iterations: u8,
     pub player: String,
-    pub active_lyric_prefix: String,
-    pub center_lyrics: bool
+    pub header: Header,
+    pub color: Color,
+    pub lyric_settings: LyricSettings
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct PartialConfig {
-    pub header: Option<String>,
-    pub header_centered: Option<bool>,
-    pub k_clusters: Option<u8>,
-    pub max_color_gen_iterations: Option<u8>,
-    pub player: Option<String>,
-    pub active_lyric_prefix: Option<String>,
-    pub center_lyrics: Option<bool>
+#[serde(default)]
+pub struct Header {
+    pub title: String,
+    pub centered: bool
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct Color {
+    pub generate: bool,
+    pub k_clusters: u8,
+    pub max_color_gen_iterations: u8,
+    pub fallback_main: String,
+    pub fallback_accent: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct LyricSettings {
+    pub active_prefix: String,
+    pub center: bool
+}
+
+impl Default for LyricSettings {
+    fn default() -> Self {
+        LyricSettings {
+            active_prefix: "".to_owned(),
+            center: true
+        }
+    }
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Header {
+            title: "{title} {artists} - {album}".to_owned(),
+            centered: false,
+        }
+    }
+}
+
+impl Default for Color {
+    fn default() -> Self {
+        Color {
+            generate: true,
+            k_clusters: 14,
+            max_color_gen_iterations: 30,
+            fallback_main: "#afd75f".to_owned(),
+            fallback_accent: "#ffffff".to_owned()
+        }
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            header: String::from("{title} {artists} - {album}"),
-            header_centered: false,
-            k_clusters: 12,
-            max_color_gen_iterations: 30,
             player: String::from(""),
-            active_lyric_prefix: String::from(""),
-            center_lyrics: true
-        }
-    }
-}
-
-impl Config {
-    fn merge(self, partial: PartialConfig) -> Self {
-        Self {
-            header: partial.header.unwrap_or(self.header),
-            header_centered: partial.header_centered.unwrap_or(self.header_centered),
-            k_clusters: partial.k_clusters.unwrap_or(self.k_clusters),
-            max_color_gen_iterations: partial.max_color_gen_iterations.unwrap_or(self.max_color_gen_iterations),
-            player: partial.player.unwrap_or(self.player),
-            active_lyric_prefix: partial.active_lyric_prefix.unwrap_or(self.active_lyric_prefix),
-            center_lyrics: partial.center_lyrics.unwrap_or(self.center_lyrics)
+            header: Header::default(),
+            color: Color::default(),
+            lyric_settings: LyricSettings::default(),
         }
     }
 }
@@ -64,21 +89,48 @@ pub fn init() -> Config {
     }
 
     path.push("config.toml");
-    let defaults = Config::default();
 
-    let partial: PartialConfig = match fs::read(&path) {
-        Ok(bytes) => match toml::from_slice(&bytes) {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                eprintln!("Invalid config: {e}");
-                return defaults;
-            }
-        },
-        Err(_) => {
-            let _ = fs::write(&path, toml::to_string_pretty(&defaults).unwrap());
-            return defaults;
+    let config = fs::read(&path)
+        .ok()
+        .and_then(|b| toml::from_slice(&b).ok());
+
+    match config {
+        Some(cfg) => cfg,
+        None => {
+            let default = Config::default();
+            let _ = fs::write(&path, toml::to_string_pretty(&default).unwrap());
+            default
         }
-    };
+    }
+}
 
-    defaults.merge(partial)
+impl Color {
+
+    pub fn fallback_main_rgb(&self) -> [u8; 3] {
+        Self::hex_to_rgb(&self.fallback_main)
+            .ok()
+            .unwrap_or([175, 215, 95]) // Color::Indexed(149)
+    }
+
+    pub fn fallback_accent_rgb(&self) -> [u8; 3] {
+        Self::hex_to_rgb(&self.fallback_accent)
+            .ok()
+            .unwrap_or([95, 95, 0]) // Color::Indexed(58)
+    }
+
+    fn hex_to_rgb(hex: &str) -> Result<[u8; 3], &'static str> {
+        let hex = hex.trim_start_matches('#');
+
+        if hex.len() != 6 {
+            return Err("Hex string must be exactly 6 characters long");
+        }
+
+        // Parse red, green, and blue components from hex radix (base 16)
+        let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| "Invalid hex character in Red component")?;
+        let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| "Invalid hex character in Green component")?;
+        let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| "Invalid hex character in Blue component")?;
+
+        Ok([r, g, b])
+    }
+
 }

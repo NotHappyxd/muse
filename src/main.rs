@@ -66,8 +66,12 @@ fn run_ui(
                     let song = Song::new(title, album, artists, length);
 
                     app.active_song = Some(song);
-                    app.song_theme = [0, 0, 0];
-                    app.song_accent = [0, 0, 0];
+
+                    if app.config.color.generate {
+                        app.song_theme = [0, 0, 0];
+                        app.song_accent = [0, 0, 0];
+                    }
+
                     app.lyrics = None;
                     app.manual_scroll_offset = Cell::new(0)
                 }

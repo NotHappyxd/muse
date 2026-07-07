@@ -42,11 +42,23 @@ impl Song {
 
 impl App {
     pub fn new(config: Config) -> Self {
+        let theme = if config.color.generate { 
+            [0, 0, 0]
+        }else {
+            config.color.fallback_main_rgb()
+        };
+        
+        let accent = if config.color.generate {
+            [0, 0, 0]
+        }else {
+            config.color.fallback_accent_rgb()
+        };
+        
         Self {
             active_song: None,
             lyrics: None,
-            song_theme: [0, 0, 0],
-            song_accent: [0, 0, 0],
+            song_theme: theme,
+            song_accent: accent,
             anchor_position: 0,
             anchor_instant: None,
             is_playing: false,
