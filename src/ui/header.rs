@@ -7,7 +7,7 @@ use crate::ui::state::App;
 pub fn header(area: Rect, buf: &mut Buffer, app: &App) {
     let text = match app.active_song.as_ref() {
         Some(song) => {
-            let raw_header = app.config.header.replace("{title}", &song.title)
+            let raw_header = app.config.header.title.replace("{title}", &song.title)
                 .replace("{artists}", &song.artists[0])
                 .replace("{album}", &song.album);
 
@@ -20,7 +20,7 @@ pub fn header(area: Rect, buf: &mut Buffer, app: &App) {
         .bold()
         .left_aligned();
 
-    if app.config.header_centered {
+    if app.config.header.centered {
         header = header.centered()
     }
 

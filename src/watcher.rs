@@ -213,15 +213,24 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
                             let title_clone = title.clone();
                             let tx2 = tx.clone();
 
-                            let k_clusters = config.k_clusters;
-                            let max_iterations = config.max_color_gen_iterations;
+                            let k_clusters = config.color.k_clusters;
+                            let max_iterations = config.color.max_color_gen_iterations;
+                            let generate_theme = config.color.generate;
 
                             tokio::spawn(async move {
-                                let lyric_future =
-                                    fetch_lyric(&title_clone, &artists_clone, &album_str, length);
                                 let theme_future = fetch_theme(art_url, &tx2, k_clusters, max_iterations);
 
-                                let (lyrics, _) = tokio::join!(lyric_future, theme_future);
+                                let lyric_future =
+                                    fetch_lyric(&title_clone, &artists_clone, &album_str, length);
+
+                                let lyrics = if generate_theme {
+                                    let (_, lyrics) = tokio::join!(theme_future, lyric_future);
+
+                                    lyrics
+                                }else {
+                                    lyric_future.await
+                                };
+
                                 let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
                             });
                         }

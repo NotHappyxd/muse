@@ -32,18 +32,9 @@ impl App {
         let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
 
         let [r, g, b] = self.song_theme;
-        let blank = r == 0 && g == 0 && b == 0;
 
-        let filled_style = if blank {
-            Color::Indexed(149)
-        } else {
-            Color::from(self.song_theme)
-        };
-        let unfilled_style = if blank {
-            Color::Indexed(58)
-        } else {
-            Color::from([r / 3, g / 3, b / 3])
-        };
+        let filled_style = Color::from(self.song_theme);
+        let unfilled_style = Color::from([r / 3, g / 3, b / 3]);
 
         LineGauge::default()
             .label("")
@@ -71,7 +62,7 @@ impl App {
         };
 
         let accent = Color::from(self.song_accent);
-        let alignment = if self.config.center_lyrics {
+        let alignment = if self.config.lyric_settings.center {
             Alignment::Center
         }else {
             Alignment::Left
@@ -118,7 +109,7 @@ impl App {
             let style = if i < active_idx {
                 Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
             } else if i == active_idx {
-                text.insert_str(0, &self.config.active_lyric_prefix);
+                text.insert_str(0, &self.config.lyric_settings.active_prefix);
 
                 Style::default().fg(accent).bold()
             } else {
