@@ -25,7 +25,7 @@ pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iteratio
     let main_color = nudge_for_contrast(main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     Theme {
         main: main_color,
-        accent: nudge_for_contrast(accent.color, main_color, 4.5, 0.35, 0.82)
+        accent: nudge_for_contrast(accent.color, main_color, 4.5, 0.4, 0.82)
     }
 }
 

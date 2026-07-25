@@ -1,5 +1,4 @@
 use std::fs;
-use crossterm::style::Colors;
 use expanduser::expanduser;
 use serde::{Deserialize, Serialize};
 
