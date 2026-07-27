@@ -16,6 +16,7 @@ pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iteratio
     let main = clusters.first().unwrap();
     let accent = clusters.iter()
         .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
+        .filter(|c| c.size >= total_pixels * 0.008)
         .skip(1)
         .max_by(|x, y| {
             accent_score(x, main, total_pixels, account_light).partial_cmp(
@@ -26,6 +27,7 @@ pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iteratio
     let accent_lab = if let Some(cluster) = accent {
         cluster.color
     }else {
+        println!("Synthesizing");
         synthesize_harmonic_accent(&main.color)
     };
 
@@ -103,9 +105,17 @@ pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
 }
 
 fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
+    if base_color.chroma() < 0.03 {
+        return Lab {
+            l: 0.90,
+            a: 0.0,
+            b: 0.0
+        }
+    }
+
     let mut hsl = conversions::to_hsl(base_color);
-    hsl[0] = (hsl[0] + 120.0) % 360.0; // Triadic hue shift
-    hsl[1] = (hsl[1] * 1.3).clamp(0.4, 0.95); // Boost saturation for visibility
+    hsl[0] = (hsl[0] + 30.0) % 360.0; // Triadic hue shift
+    hsl[1] = (hsl[1] * 1.2).clamp(0.3, 0.85); // Boost saturation for visibility
 
     let rgb = conversions::hsl_to_rgb(hsl);
     conversions::rgb_to_oklab(rgb)

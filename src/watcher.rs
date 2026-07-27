@@ -29,6 +29,7 @@ pub enum AppEvent {
     },
     PlayerCommand(PlayerCommand),
     ThemeFetched {
+        song_title: String,
         rgb: [u8; 3],
         accent: [u8; 3],
     },
@@ -207,10 +208,16 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
                             .map(|us| (us / 1_000_000) as u32)
                             .unwrap_or(0);
 
+                        let album_formatted = album.unwrap_or("".to_owned());
+
+                        let _ = tx.send(AppEvent::SongChanged {
+                            title: title.clone(),
+                            album: album_formatted.clone(),
+                            artists: Vec::clone(&artists),
+                            length,
+                        });
+
                         if let Some(art_url) = metadata.art_url().map(str::to_owned) {
-                            let album_str = album.clone().unwrap_or_else(|| String::from(""));
-                            let artists_clone = Vec::clone(&artists);
-                            let title_clone = title.clone();
                             let tx2 = tx.clone();
 
                             let k_clusters = config.color.k_clusters;
@@ -218,10 +225,10 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
                             let generate_theme = config.color.generate;
 
                             tokio::spawn(async move {
-                                let theme_future = fetch_theme(art_url, &tx2, k_clusters, max_iterations);
+                                let theme_future = fetch_theme(title.clone(), art_url, &tx2, k_clusters, max_iterations);
 
                                 let lyric_future =
-                                    fetch_lyric(&title_clone, &artists_clone, &album_str, length);
+                                    fetch_lyric(&title, &artists, &album_formatted, length);
 
                                 let lyrics = if generate_theme {
                                     let (_, lyrics) = tokio::join!(theme_future, lyric_future);
@@ -234,13 +241,6 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
                                 let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
                             });
                         }
-
-                        let _ = tx.send(AppEvent::SongChanged {
-                            title,
-                            album: album.unwrap_or_else(|| String::from("")),
-                            artists,
-                            length,
-                        });
                     }
 
                     if different_title && !valid_album {

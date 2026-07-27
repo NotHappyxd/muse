@@ -68,12 +68,17 @@ fn run_ui(
                     app.active_song = Some(song);
 
                     if app.config.color.generate {
-                        app.song_theme = [0, 0, 0];
-                        app.song_accent = [0, 0, 0];
+                        let song = app.active_song.as_ref().unwrap();
+
+                        if app.theme.title.as_ref() != Some(&song.title) {
+                            app.theme.title = None;
+                            app.theme.main = None;
+                            app.theme.accent = None;
+                        }
                     }
 
                     app.lyrics = None;
-                    app.manual_scroll_offset = Cell::new(0)
+                    app.manual_scroll_offset = Cell::new(0);
                 }
 
                 AppEvent::PlaybackAnchor { position_ms, is_playing, at } => {
@@ -83,7 +88,7 @@ fn run_ui(
                 AppEvent::PlayerDetached => {}
 
                 AppEvent::Error { error: _error } => {
-
+                    panic!("{}", _error)
                 }
 
                 AppEvent::LyricsFetched { lyrics } => {
@@ -94,9 +99,10 @@ fn run_ui(
                 AppEvent::PlayerCommand(command) => {
                     handle_player_command(command)
                 },
-                AppEvent::ThemeFetched { rgb, accent } => {
-                    app.song_theme = rgb;
-                    app.song_accent = accent;
+                AppEvent::ThemeFetched { song_title, rgb, accent } => {
+                    app.theme.title = Some(song_title);
+                    app.theme.main = Some(rgb);
+                    app.theme.accent = Some(accent);
                 }
             }
         }

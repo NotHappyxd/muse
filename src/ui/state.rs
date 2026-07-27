@@ -17,8 +17,7 @@ pub struct Song {
 pub struct App {
     pub active_song: Option<Song>,
     pub lyrics: Option<LyricResponse>,
-    pub song_theme: [u8; 3],
-    pub song_accent: [u8; 3],
+    pub theme: Theme,
     pub anchor_position: u128,
     pub anchor_instant: Option<Instant>,
     pub is_playing: bool,
@@ -28,6 +27,12 @@ pub struct App {
     pub config: Config
 }
 
+#[derive(Default, Debug)]
+pub struct Theme {
+    pub title: Option<String>,
+    pub main: Option<[u8; 3]>,
+    pub accent: Option<[u8; 3]>,
+}
 
 impl Song {
     pub fn new(title: String, album: String, artists: Vec<String>, length: u32) -> Self {
@@ -43,22 +48,21 @@ impl Song {
 impl App {
     pub fn new(config: Config) -> Self {
         let theme = if config.color.generate {
-            [0, 0, 0]
+            None
         }else {
-            config.color.fallback_main_rgb()
+            Some(config.color.fallback_main_rgb())
         };
 
         let accent = if config.color.generate {
-            [0, 0, 0]
+            None
         }else {
-            config.color.fallback_accent_rgb()
+            Some(config.color.fallback_accent_rgb())
         };
 
         Self {
             active_song: None,
             lyrics: None,
-            song_theme: theme,
-            song_accent: accent,
+            theme: Theme::new(&config),
             anchor_position: 0,
             anchor_instant: None,
             is_playing: false,
@@ -80,6 +84,24 @@ impl App {
             None => self.anchor_position,
             Some(instant) => {
                 self.anchor_position + Instant::now().saturating_duration_since(instant).as_millis()
+            }
+        }
+    }
+}
+
+impl Theme {
+    pub fn new(config: &Config) -> Self {
+        if config.color.generate {
+            Theme {
+                title: None,
+                main: None,
+                accent: None
+            }
+        }else {
+            Theme {
+                title: None,
+                main: Some(config.color.fallback_main_rgb()),
+                accent: Some(config.color.fallback_accent_rgb()),
             }
         }
     }

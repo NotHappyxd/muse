@@ -43,7 +43,7 @@ pub fn rgb_to_lab_arr(rgb: [u8; 3]) -> [f32; 3] {
     ]
 }
 
-fn oklab_to_linear_srgb(lab: &Lab) -> [f32; 3] {
+pub fn oklab_to_linear_srgb(lab: &Lab) -> [f32; 3] {
     let l_ = lab.l + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
     let m_ = lab.l - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
     let s_ = lab.l - 0.0894841775 * lab.a - 1.2914855480 * lab.b;
@@ -64,7 +64,7 @@ fn linear_to_srgb(linear: [f32; 3]) -> [u8; 3] {
     linear_channel_to_srgb_channel(linear[2])]
 }
 
-fn oklab_to_rgb(lab: &Lab) -> [u8; 3] {
+pub fn oklab_to_rgb(lab: &Lab) -> [u8; 3] {
     let linear = oklab_to_linear_srgb(lab);
 
     linear_to_srgb(linear)

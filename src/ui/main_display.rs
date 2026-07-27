@@ -31,9 +31,9 @@ impl App {
 
         let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
 
-        let [r, g, b] = self.song_theme;
+        let [r, g, b] = self.theme.main.unwrap_or(self.config.color.fallback_main_rgb());
 
-        let filled_style = Color::from(self.song_theme);
+        let filled_style = Color::from([r, g, b]);
         let unfilled_style = Color::from([r / 3, g / 3, b / 3]);
 
         LineGauge::default()
@@ -60,8 +60,8 @@ impl App {
         let Some(active_song) = &self.active_song else {
             return
         };
-
-        let accent = Color::from(self.song_accent);
+        
+        let accent = Color::from(self.theme.accent.unwrap_or(self.config.color.fallback_accent_rgb()));
         let alignment = if self.config.lyric_settings.center {
             Alignment::Center
         }else {
