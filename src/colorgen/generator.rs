@@ -1,6 +1,6 @@
 use image::DynamicImage;
-use crate::colorgen::conversions;
-use crate::colorgen::conversions::hsl_to_rgb;
+use crate::colorgen::{conversions, conversions_new};
+use crate::colorgen::conversions::{hsl_to_rgb};
 use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster, Lab};
 
 pub struct Theme {
@@ -12,26 +12,34 @@ pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iteratio
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
+    const MIN_DIST_SQ: f32 = 0.0225;
+
     let main = clusters.first().unwrap();
     let accent = clusters.iter()
+        .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
         .skip(1)
         .max_by(|x, y| {
             accent_score(x, main, total_pixels, account_light).partial_cmp(
                 &accent_score(y, main, total_pixels, account_light)
             ).unwrap()
-        })
-        .unwrap();
+        });
 
-    let main_color = nudge_for_contrast(main.color, [13, 13, 13], 3.0, 0.2, 0.82);
+    let accent_lab = if let Some(cluster) = accent {
+        cluster.color
+    }else {
+        synthesize_harmonic_accent(&main.color)
+    };
+
+    let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     Theme {
         main: main_color,
-        accent: nudge_for_contrast(accent.color, main_color, 4.5, 0.35, 0.82)
+        accent: nudge_for_contrast(&accent_lab, main_color, 4.5, 0.35, 0.82)
     }
 }
 
 fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_light: bool) -> f32 {
     let chroma = cluster.color.chroma();
-    let contrast = cluster.color.contrast(&main.color);
+    let contrast = cluster.color.accent_distance_squared(&main.color).sqrt();
     let lightness_diff = ((cluster.color.l - main.color.l).abs() / 100.0).max(0.2);
     let size_weight = (cluster.size / total_pixels).sqrt();
 
@@ -39,34 +47,42 @@ fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_li
 }
 
 // https://github.com/Harman1307/iris/blob/main/iris/generator.py#L125
-pub fn nudge_for_contrast(color: Lab, background_rgb: [u8; 3], target_ratio: f32, hard_min: f32, hard_max: f32) -> [u8; 3] {
-    let mut hsl = conversions::to_hsl(&color);
+pub fn nudge_for_contrast(
+    color: &Lab,
+    background_rgb: [u8; 3],
+    target_ratio: f32,
+    hard_min: f32,
+    hard_max: f32
+) -> [u8; 3] {
+    let mut hsl = conversions_new::to_hsl(&color);
     hsl[2] = hsl[2].clamp(hard_min, hard_max);
 
-    let darker = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
-    let mut low = if darker { hard_min } else { hsl[2] };
-    let mut high = if darker { hsl[2] } else { hard_max };
+    // True if the foreground color is currently lighter than the background
+    let is_lighter = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
+
+    let mut low = if is_lighter { hsl[2] } else { hard_min };
+    let mut high = if is_lighter { hard_max } else { hsl[2] };
 
     for _ in 0..12 {
         let mid = (low + high) / 2.0;
         let rgb = hsl_to_rgb([hsl[0], hsl[1], mid]);
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
-            if darker {
-                low = mid;
-            }else {
+            if is_lighter {
                 high = mid;
+            } else {
+                low = mid;
             }
-        }else {
-            if darker {
-                high = mid;
-            }else {
+        } else {
+            if is_lighter {
                 low = mid;
+            } else {
+                high = mid;
             }
         }
     }
 
-    hsl_to_rgb([hsl[0], hsl[1], if darker { low } else { high }])
+    hsl_to_rgb([hsl[0], hsl[1], if is_lighter { high } else { low }])
 }
 
 fn luminance(rgb: [u8; 3]) -> f32 {
@@ -85,4 +101,13 @@ pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
     let lb = luminance(b);
     let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
     (hi + 0.05) / (lo + 0.05)
+}
+
+fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
+    let mut hsl = conversions_new::to_hsl(base_color);
+    hsl[0] = (hsl[0] + 120.0) % 360.0; // Triadic hue shift
+    hsl[1] = (hsl[1] * 1.3).clamp(0.4, 0.95); // Boost saturation for visibility
+
+    let rgb = conversions::hsl_to_rgb(hsl);
+    conversions_new::rgb_to_oklab(rgb)
 }

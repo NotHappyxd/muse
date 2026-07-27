@@ -1,5 +1,5 @@
 use image::{DynamicImage, GenericImageView};
-use crate::colorgen::conversions;
+use crate::colorgen::{conversions, conversions_new};
 
 const QUANTIZATION_LEVEL: usize = 5;
 const BIN_COUNT: usize = 1 << (QUANTIZATION_LEVEL * 3);
@@ -37,14 +37,14 @@ pub fn color_histogram(img: &DynamicImage) -> Vec<(Lab, f32)> {
 
         let idx = quantize_pixel(rgb[0], rgb[1], rgb[2]);
         let bin = &mut bins[idx];
-        let lab = conversions::rgb_to_lab([rgb[0], rgb[1], rgb[2]]);
+        let lab = conversions_new::rgb_to_oklab([rgb[0], rgb[1], rgb[2]]);
 
         let dx = (x as f32 + 0.5) / img.width() as f32 - 0.5;
         let dy = (y as f32 + 0.5) / img.height() as f32 - 0.5;
 
         let dist2 = dx * dx + dy * dy;
 
-        let weight = 0.75 + 0.25 * (-dist2 * 8.0).exp();
+        let weight = 0.15 + 0.85 * (-dist2 * 18.0).exp();
 
         bin.l_sum += lab.l * weight;
         bin.a_sum += lab.a * weight;
@@ -119,7 +119,7 @@ pub(crate) fn kmeans(
             }
         }
 
-        if highest_movement < 0.05 {
+        if highest_movement < 0.005 {
             break
         }
     }
@@ -184,6 +184,14 @@ impl Lab {
         let db = self.b - other.b;
 
         dl * dl + da * da + db * db
+    }
+
+    pub fn accent_distance_squared(&self, other: &Self) -> f32 {
+        let dl = self.l - other.l;
+        let da = self.a - other.a;
+        let db = self.b - other.b;
+
+        (dl * dl * 0.8) + (da * da * 1.2) + (db * db * 1.2)
     }
 
     pub fn chroma(&self) -> f32 {
