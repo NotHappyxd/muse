@@ -1,5 +1,5 @@
 use image::{DynamicImage, GenericImageView};
-use crate::colorgen::{conversions, conversions_new};
+use crate::colorgen::conversions;
 
 const QUANTIZATION_LEVEL: usize = 5;
 const BIN_COUNT: usize = 1 << (QUANTIZATION_LEVEL * 3);
@@ -37,7 +37,7 @@ pub fn color_histogram(img: &DynamicImage) -> Vec<(Lab, f32)> {
 
         let idx = quantize_pixel(rgb[0], rgb[1], rgb[2]);
         let bin = &mut bins[idx];
-        let lab = conversions_new::rgb_to_oklab([rgb[0], rgb[1], rgb[2]]);
+        let lab = conversions::rgb_to_oklab([rgb[0], rgb[1], rgb[2]]);
 
         let dx = (x as f32 + 0.5) / img.width() as f32 - 0.5;
         let dy = (y as f32 + 0.5) / img.height() as f32 - 0.5;

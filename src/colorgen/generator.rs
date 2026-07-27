@@ -1,6 +1,5 @@
 use image::DynamicImage;
-use crate::colorgen::{conversions, conversions_new};
-use crate::colorgen::conversions::{hsl_to_rgb};
+use crate::colorgen::conversions;
 use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster, Lab};
 
 pub struct Theme {
@@ -54,18 +53,18 @@ pub fn nudge_for_contrast(
     hard_min: f32,
     hard_max: f32
 ) -> [u8; 3] {
-    let mut hsl = conversions_new::to_hsl(&color);
+    let mut hsl = conversions::to_hsl(&color);
     hsl[2] = hsl[2].clamp(hard_min, hard_max);
 
     // True if the foreground color is currently lighter than the background
-    let is_lighter = luminance(hsl_to_rgb(hsl)) >= luminance(background_rgb);
+    let is_lighter = luminance(conversions::hsl_to_rgb(hsl)) >= luminance(background_rgb);
 
     let mut low = if is_lighter { hsl[2] } else { hard_min };
     let mut high = if is_lighter { hard_max } else { hsl[2] };
 
     for _ in 0..12 {
         let mid = (low + high) / 2.0;
-        let rgb = hsl_to_rgb([hsl[0], hsl[1], mid]);
+        let rgb = conversions::hsl_to_rgb([hsl[0], hsl[1], mid]);
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
             if is_lighter {
@@ -82,7 +81,7 @@ pub fn nudge_for_contrast(
         }
     }
 
-    hsl_to_rgb([hsl[0], hsl[1], if is_lighter { high } else { low }])
+    conversions::hsl_to_rgb([hsl[0], hsl[1], if is_lighter { high } else { low }])
 }
 
 fn luminance(rgb: [u8; 3]) -> f32 {
@@ -104,10 +103,10 @@ pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
 }
 
 fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
-    let mut hsl = conversions_new::to_hsl(base_color);
+    let mut hsl = conversions::to_hsl(base_color);
     hsl[0] = (hsl[0] + 120.0) % 360.0; // Triadic hue shift
     hsl[1] = (hsl[1] * 1.3).clamp(0.4, 0.95); // Boost saturation for visibility
 
     let rgb = conversions::hsl_to_rgb(hsl);
-    conversions_new::rgb_to_oklab(rgb)
+    conversions::rgb_to_oklab(rgb)
 }

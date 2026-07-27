@@ -1,26 +1,21 @@
-use std::sync::OnceLock;
+use std::array;
 use crate::colorgen::kmeans::Lab;
+use std::sync::{LazyLock, OnceLock};
 
-static LINEAR_CACHE: OnceLock<[f32; 256]> = OnceLock::new();
-
-fn get_linear_cache() -> &'static [f32; 256] {
-    LINEAR_CACHE.get_or_init(|| {
-        let mut cache = [0.0f32; 256];
-        for i in 0..256 {
-            let v = i as f32 / 255.0;
-            cache[i] = if v > 0.04045 {
-                ((v + 0.055) / 1.055).powf(2.4)
-            } else {
-                v / 12.92
-            };
+static LINEAR_CACHE: LazyLock<[f32; 256]> = LazyLock::new(|| {
+    array::from_fn(|i| {
+        let v = i as f32 / 255.0;
+        if v > 0.04045 {
+            ((v + 0.055) / 1.055).powf(2.4)
+        } else {
+            v / 12.92
         }
-        cache
     })
-}
+});
 
-pub fn rgb_to_lab(rgb: [u8; 3]) -> Lab {
+pub fn rgb_to_oklab(rgb: [u8; 3]) -> Lab {
     let arr = rgb_to_lab_arr(rgb);
-    
+
     Lab {
         l: arr[0],
         a: arr[1],
@@ -29,95 +24,65 @@ pub fn rgb_to_lab(rgb: [u8; 3]) -> Lab {
 }
 
 pub fn rgb_to_lab_arr(rgb: [u8; 3]) -> [f32; 3] {
-    let linear_r = get_linear_cache()[rgb[0] as usize];
-    let linear_g = get_linear_cache()[rgb[1] as usize];
-    let linear_b = get_linear_cache()[rgb[2] as usize];
+    let linear_r = LINEAR_CACHE[rgb[0] as usize];
+    let linear_g = LINEAR_CACHE[rgb[1] as usize];
+    let linear_b = LINEAR_CACHE[rgb[2] as usize];
 
-    let x = linear_r * 0.4124564 + linear_g * 0.3575761 + linear_b * 0.1804375;
-    let y = linear_r * 0.2126729 + linear_g * 0.7151522 + linear_b * 0.0721750;
-    let z = linear_r * 0.0193339 + linear_g * 0.1191920 + linear_b * 0.9503041;
+    let mut l = 0.4122214708 * linear_r + 0.5363325363 * linear_g + 0.0514459929 * linear_b;
+    let mut m = 0.2119034982 * linear_r + 0.6806995451 * linear_g + 0.1073969566 * linear_b;
+    let mut s = 0.0883024619 * linear_r + 0.2817188376 * linear_g + 0.6299787005 * linear_b;
 
-    xyz_to_lab(x, y, z)
-}
-
-fn xyz_to_lab(x: f32, y: f32, z: f32) -> [f32; 3] {
-    // D65 reference white
-    const XN: f32 = 0.95047;
-    const YN: f32 = 1.00000;
-    const ZN: f32 = 1.08883;
-
-    let fx = lab_f(x / XN);
-    let fy = lab_f(y / YN);
-    let fz = lab_f(z / ZN);
-
-    [116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz)]
-}
-
-
-fn lab_f(t: f32) -> f32 {
-    const EPSILON: f32 = 216.0 / 24389.0; // (6/29)^3
-    const KAPPA: f32 = 24389.0 / 27.0;    // (29/3)^3
-
-    if t > EPSILON {
-        t.cbrt()
-    } else {
-        (KAPPA * t + 16.0) / 116.0
-    }
-}
-
-// -----
-pub fn lab_to_rgb(lab: &Lab) -> [u8; 3] {
-    let (x, y, z) = lab_to_xyz([lab.l, lab.a, lab.b]);
-
-    let r = x *  3.2404542 + y * -1.5371385 + z * -0.4985314;
-    let g = x * -0.9692660 + y *  1.8760108 + z *  0.0415560;
-    let b = x *  0.0556434 + y * -0.2040259 + z *  1.0572252;
+    l = l.cbrt();
+    m = m.cbrt();
+    s = s.cbrt();
 
     [
-        linear_to_srgb(r),
-        linear_to_srgb(g),
-        linear_to_srgb(b),
+        0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+        1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+        0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
     ]
 }
 
-fn lab_to_xyz(lab: [f32; 3]) -> (f32, f32, f32) {
-    const XN: f32 = 0.95047;
-    const YN: f32 = 1.00000;
-    const ZN: f32 = 1.08883;
+fn oklab_to_linear_srgb(lab: &Lab) -> [f32; 3] {
+    let l_ = lab.l + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+    let m_ = lab.l - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+    let s_ = lab.l - 0.0894841775 * lab.a - 1.2914855480 * lab.b;
 
-    let fy = (lab[0] + 16.0) / 116.0;
-    let fx = fy + lab[1] / 500.0;
-    let fz = fy - lab[2] / 200.0;
+    let l = l_ * l_ * l_;
+    let m = m_ * m_ * m_;
+    let s = s_ * s_ * s_;
 
-    (
-        XN * lab_f_inv(fx),
-        YN * lab_f_inv(fy),
-        ZN * lab_f_inv(fz),
-    )
+    [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+    ]
 }
 
-fn lab_f_inv(t: f32) -> f32 {
-    const DELTA: f32 = 6.0 / 29.0;
-
-    if t > DELTA {
-        t * t * t
-    } else {
-        3.0 * DELTA * DELTA * (t - 4.0 / 29.0)
-    }
+fn linear_to_srgb(linear: [f32; 3]) -> [u8; 3] {
+    [linear_channel_to_srgb_channel(linear[0]),
+    linear_channel_to_srgb_channel(linear[1]),
+    linear_channel_to_srgb_channel(linear[2])]
 }
 
-fn linear_to_srgb(v: f32) -> u8 {
-    let v = if v <= 0.0031308 {
-        12.92 * v
+fn oklab_to_rgb(lab: &Lab) -> [u8; 3] {
+    let linear = oklab_to_linear_srgb(lab);
+
+    linear_to_srgb(linear)
+}
+
+fn linear_channel_to_srgb_channel(c: f32) -> u8 {
+    let v = if c <= 0.0031308 {
+        12.92 * c
     } else {
-        1.055 * v.powf(1.0 / 2.4) - 0.055
+        1.055 * c.powf(1.0 / 2.4) - 0.055
     };
 
     (v.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
+
 pub fn to_hsl(color: &Lab) -> [f32; 3] {
-    let rgb_normal = lab_to_rgb(&color)
+    let rgb_normal = oklab_to_rgb(&color)
         .map(|color| color as f32 / 255.0);
 
     let mut iter = rgb_normal.iter();
