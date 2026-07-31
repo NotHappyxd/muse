@@ -134,8 +134,13 @@ pub(crate) fn kmeans(
 
 pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
     let mut centroids: Vec<Cluster> = Vec::with_capacity(k);
+    let most_dominant = histogram
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .unwrap();
+
     centroids.push(Cluster {
-        color: histogram[fastrand::usize(0..histogram.len())].0,
+        color: most_dominant.0,
         size: 0.0,
     });
 

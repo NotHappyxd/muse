@@ -205,7 +205,6 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
 
     state.current_title = Some(song_info.title.clone());
     state.current_album = Some(song_info.album.clone());
-
     state.album_retry = 0;
 
     let artists = song_info.artists.clone();
@@ -226,9 +225,11 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
 
         tokio::spawn(async move {
             if generate_theme {
-                tokio::spawn(fetch_theme(song_info.title.clone(), art_url, tx2.clone(), k_clusters, max_iterations));
+                let theme_channel = tx2.clone();
+
+                tokio::spawn(fetch_theme(song_info.title.clone(), art_url, theme_channel, k_clusters, max_iterations));
             }
-            
+
             let lyrics = fetch_lyric(&song_info.title, &song_info.artists, &song_info.album, song_info.length).await;
             let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
         });
