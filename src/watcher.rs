@@ -1,6 +1,6 @@
 use crate::lyric::{LyricResponse, fetch_lyric};
 use crate::theme::fetch_theme;
-use mpris::{PlaybackStatus, PlayerFinder};
+use mpris::{Metadata, PlaybackStatus, Player, PlayerFinder};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
@@ -107,17 +107,13 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
     match active {
         None => {
             if state.current_bus.is_some() {
-                state.current_bus = None;
-                state.current_title = None;
-                state.current_album = None;
+                state.reset_session();
                 let _ = tx.send(AppEvent::PlayerDetached);
             }
 
             if state.anchor_instant.is_some() || state.anchor_playing {
-                let estimated_position = predicted_position(state, Instant::now());
-                state.anchor_position = Some(estimated_position);
-                state.anchor_instant = None;
-                state.anchor_playing = false;
+                let estimated_position = state.predicted_position(Instant::now());
+                state.pause_anchor(estimated_position);
 
                 let _ = tx.send(AppEvent::PlaybackAnchor {
                     position_ms: estimated_position,
@@ -129,139 +125,167 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
             let _ = tx.send(AppEvent::Idle);
         }
 
-        Some(player) => {
-            let bus = player.bus_name().to_owned();
-            let new_session = state.anchor_position.is_none() && !state.anchor_playing;
-
-            if state.current_bus.as_deref() != Some(&bus) {
-                if state.current_bus.is_some() {
-                    let _ = tx.send(AppEvent::PlayerDetached);
-                }
-                state.current_bus = Some(bus);
-                state.current_title = None;
-                state.current_album = None;
-            }
-
-            let now = Instant::now();
-            let (poll_ms, have_real_reading) = match player.get_position() {
-                Ok(pos) => (pos.as_millis(), true),
-                Err(_) => (predicted_position(state, now), false),
-            };
-
-            let drifted = have_real_reading && !new_session && {
-                let predicted = predicted_position(state, now);
-                (poll_ms as i128 - predicted as i128).abs() > MAXIMUM_DRIFT_ALLOWED
-            };
-
-            if new_session || drifted {
-                state.anchor_position = Some(poll_ms);
-                state.anchor_instant = Some(now);
-                state.anchor_playing = true;
-
-                let _ = tx.send(AppEvent::PlaybackAnchor {
-                    position_ms: poll_ms,
-                    is_playing: true,
-                    at: now,
-                });
-            }
-
-            match player.get_metadata() {
-                Err(e) => {
-                    let _ = tx.send(AppEvent::Error {
-                        error: format!("Failed to get metadata: {e}"),
-                    });
-                }
-
-                Ok(metadata) => {
-                    let title = metadata.title().unwrap_or("Unknown").to_owned();
-
-                    let raw_album = metadata.album_name();
-                    let album = raw_album
-                        .filter(|a| !a.trim().is_empty() && *a != "Unknown")
-                        .map(|a| a.to_owned());
-
-                    let different_title = state.current_title.as_ref() != Some(&title);
-                    let valid_album = album.is_some();
-
-                    if (different_title && valid_album)
-                        || (different_title && !valid_album && state.album_retry >= 3)
-                    {
-                        state.current_title = Some(title.clone());
-
-                        if !valid_album && state.album_retry >= 3 {
-                            state.current_album = Some(String::from(""));
-                        } else {
-                            state.current_album = album.clone();
-                        }
-
-                        state.album_retry = 0;
-
-                        let artists = metadata
-                            .artists()
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(str::to_owned)
-                            .collect();
-
-                        let length = metadata
-                            .length_in_microseconds()
-                            .map(|us| (us / 1_000_000) as u32)
-                            .unwrap_or(0);
-
-                        let album_formatted = album.unwrap_or("".to_owned());
-
-                        let _ = tx.send(AppEvent::SongChanged {
-                            title: title.clone(),
-                            album: album_formatted.clone(),
-                            artists: Vec::clone(&artists),
-                            length,
-                        });
-
-                        if let Some(art_url) = metadata.art_url().map(str::to_owned) {
-                            let tx2 = tx.clone();
-
-                            let k_clusters = config.color.k_clusters;
-                            let max_iterations = config.color.max_color_gen_iterations;
-                            let generate_theme = config.color.generate;
-
-                            tokio::spawn(async move {
-                                let theme_future = fetch_theme(title.clone(), art_url, &tx2, k_clusters, max_iterations);
-
-                                let lyric_future =
-                                    fetch_lyric(&title, &artists, &album_formatted, length);
-
-                                let lyrics = if generate_theme {
-                                    let (_, lyrics) = tokio::join!(theme_future, lyric_future);
-
-                                    lyrics
-                                }else {
-                                    lyric_future.await
-                                };
-
-                                let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
-                            });
-                        }
-                    }
-
-                    if different_title && !valid_album {
-                        state.album_retry += 1
-                    }
-                }
-            }
-        }
+        Some(player) => handle_active_player(tx, state, &player, config)
     }
 }
 
-fn predicted_position(state: &WatcherState, now: Instant) -> u128 {
-    let Some(anchor_position) = state.anchor_position else {
-        return 0;
+fn handle_active_player(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, player: &Player, config: &Config) {
+    let bus = player.bus_name().to_owned();
+
+    if state.current_bus.as_deref() != Some(&bus) {
+        if state.current_bus.is_some() {
+            let _ = tx.send(AppEvent::PlayerDetached);
+        }
+
+        state.reset_session();
+        state.current_bus = Some(bus);
+    }
+
+    sync_playback_drift(player, state, tx);
+
+    match player.get_metadata() {
+        Err(e) => {
+            let _ = tx.send(AppEvent::Error {
+                error: format!("Failed to get metadata: {e}"),
+            });
+        }
+
+        Ok(metadata) => handle_metadata(&metadata, state, config, tx)
+    }
+}
+
+fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
+    let new_session = state.anchor_position.is_none() && !state.anchor_playing;
+
+    let now = Instant::now();
+    let (poll_ms, have_real_reading) = match player.get_position() {
+        Ok(pos) => (pos.as_millis(), true),
+        Err(_) => (state.predicted_position(now), false),
     };
 
-    if state.anchor_playing {
-        if let Some(anchor_at) = state.anchor_instant {
-            return anchor_position + now.saturating_duration_since(anchor_at).as_millis();
+    let drifted = have_real_reading && !new_session && {
+        let predicted = state.predicted_position(now);
+        (poll_ms as i128 - predicted as i128).abs() > MAXIMUM_DRIFT_ALLOWED
+    };
+
+    if new_session || drifted {
+        state.update_anchor(poll_ms, now, true);
+
+        let _ = tx.send(AppEvent::PlaybackAnchor {
+            position_ms: poll_ms,
+            is_playing: true,
+            at: now,
+        });
+    }
+}
+
+fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Config, tx: &UnboundedSender<AppEvent>) {
+    let title = metadata.title().unwrap_or("Unknown").to_owned();
+
+    let raw_album = metadata.album_name();
+    let album = raw_album
+        .filter(|a| !a.trim().is_empty() && *a != "Unknown")
+        .map(|a| a.to_owned());
+
+    let different_title = state.current_title.as_ref() != Some(&title);
+    let valid_album = album.is_some();
+
+    let found_valid_album = different_title && valid_album;
+    let passed_retry_threshold = different_title && !valid_album && state.album_retry >= 3;
+
+    if found_valid_album || passed_retry_threshold {
+        state.current_title = Some(title.clone());
+
+        if !valid_album && state.album_retry >= 3 {
+            state.current_album = Some(String::from(""));
+        } else {
+            state.current_album = album.clone();
+        }
+
+        state.album_retry = 0;
+
+        let artists = metadata
+            .artists()
+            .unwrap_or_default()
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+
+        let length = metadata
+            .length_in_microseconds()
+            .map(|us| (us / 1_000_000) as u32)
+            .unwrap_or(0);
+
+        let album_formatted = album.unwrap_or_default();
+
+        let _ = tx.send(AppEvent::SongChanged {
+            title: title.clone(),
+            album: album_formatted.clone(),
+            artists: Vec::clone(&artists),
+            length,
+        });
+
+        if let Some(art_url) = metadata.art_url().map(str::to_owned) {
+            let tx2 = tx.clone();
+
+            let k_clusters = config.color.k_clusters;
+            let max_iterations = config.color.max_color_gen_iterations;
+            let generate_theme = config.color.generate;
+
+            tokio::spawn(async move {
+                let theme_future = fetch_theme(title.clone(), art_url, &tx2, k_clusters, max_iterations);
+
+                let lyric_future =
+                    fetch_lyric(&title, &artists, &album_formatted, length);
+
+                let lyrics = if generate_theme {
+                    let (_, lyrics) = tokio::join!(theme_future, lyric_future);
+
+                    lyrics
+                }else {
+                    lyric_future.await
+                };
+
+                let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
+            });
         }
     }
 
-    anchor_position
+    if different_title && !valid_album {
+        state.album_retry += 1
+    }
+}
+
+impl WatcherState {
+    fn predicted_position(&self, now: Instant) -> u128 {
+        let Some(anchor_position) = self.anchor_position else {
+            return 0;
+        };
+
+        if self.anchor_playing {
+            if let Some(anchor_at) = self.anchor_instant {
+                return anchor_position + now.saturating_duration_since(anchor_at).as_millis();
+            }
+        }
+
+        anchor_position
+    }
+
+    fn reset_session(&mut self) {
+        self.current_bus = None;
+        self.current_title = None;
+        self.current_album = None;
+    }
+
+    fn update_anchor(&mut self, position: u128, now: Instant, is_playing: bool) {
+        self.anchor_position = Some(position);
+        self.anchor_instant = Some(now);
+        self.anchor_playing = is_playing;
+    }
+
+    fn pause_anchor(&mut self, position: u128) {
+        self.anchor_position = Some(position);
+        self.anchor_instant = None;
+        self.anchor_playing = false;
+    }
 }

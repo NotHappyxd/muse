@@ -1,6 +1,6 @@
 use std::array;
-use crate::colorgen::kmeans::Lab;
-use std::sync::{LazyLock, OnceLock};
+use std::sync::{LazyLock};
+use crate::colorgen::colors::Lab;
 
 static LINEAR_CACHE: LazyLock<[f32; 256]> = LazyLock::new(|| {
     array::from_fn(|i| {

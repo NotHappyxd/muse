@@ -1,12 +1,19 @@
+use crate::colorgen::colors::{find_max_chroma_oklab, wcag_contrast, Lab, Oklch};
+use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster};
+use crate::colorgen::{colors, conversions};
 use image::DynamicImage;
-use crate::colorgen::conversions;
-use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster, Lab};
 
 pub struct Theme {
     pub main: [u8; 3],
     pub accent: [u8; 3],
 }
-pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iterations: usize, account_light: bool) -> Theme {
+
+pub fn generate_from_image(
+    image: &DynamicImage,
+    k_clusters: usize,
+    max_iterations: usize,
+    account_light: bool,
+) -> Theme {
     let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
@@ -14,27 +21,26 @@ pub fn generate_from_image(image: &DynamicImage, k_clusters: usize, max_iteratio
     const MIN_DIST_SQ: f32 = 0.0225;
 
     let main = clusters.first().unwrap();
-    let accent = clusters.iter()
-        .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
-        .filter(|c| c.size >= total_pixels * 0.008)
+    let accent = clusters
+        .iter()
         .skip(1)
+        .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
         .max_by(|x, y| {
-            accent_score(x, main, total_pixels, account_light).partial_cmp(
-                &accent_score(y, main, total_pixels, account_light)
-            ).unwrap()
+            accent_score(x, main, total_pixels, account_light)
+                .partial_cmp(&accent_score(y, main, total_pixels, account_light))
+                .unwrap()
         });
 
     let accent_lab = if let Some(cluster) = accent {
         cluster.color
-    }else {
-        println!("Synthesizing");
+    } else {
         synthesize_harmonic_accent(&main.color)
     };
 
     let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     Theme {
         main: main_color,
-        accent: nudge_for_contrast(&accent_lab, main_color, 4.5, 0.35, 0.82)
+        accent: nudge_accent(&accent_lab, main_color, 4.0, true),
     }
 }
 
@@ -53,22 +59,26 @@ pub fn nudge_for_contrast(
     background_rgb: [u8; 3],
     target_ratio: f32,
     hard_min: f32,
-    hard_max: f32
+    hard_max: f32,
 ) -> [u8; 3] {
-    let mut hsl = conversions::to_hsl(&color);
-    hsl[2] = hsl[2].clamp(hard_min, hard_max);
+    let mut lch = Oklch::from_oklab(color);
+    lch.l = lch.l.clamp(hard_min, hard_max);
 
-    // True if the foreground color is currently lighter than the background
-    let is_lighter = luminance(conversions::hsl_to_rgb(hsl)) >= luminance(background_rgb);
+    let starting_rgb = conversions::oklab_to_rgb(&find_max_chroma_oklab(lch));
+    let is_lighter = colors::luminance(starting_rgb) >= colors::luminance(background_rgb);
 
-    let mut low = if is_lighter { hsl[2] } else { hard_min };
-    let mut high = if is_lighter { hard_max } else { hsl[2] };
+    let mut low = if is_lighter { lch.l } else { hard_min };
+    let mut high = if is_lighter { hard_max } else { lch.l };
+    let mut best_rgb = starting_rgb;
 
     for _ in 0..12 {
         let mid = (low + high) / 2.0;
-        let rgb = conversions::hsl_to_rgb([hsl[0], hsl[1], mid]);
+        let mut test = lch;
+        test.l = mid;
+        let rgb = conversions::oklab_to_rgb(&find_max_chroma_oklab(test));
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
+            best_rgb = rgb;
             if is_lighter {
                 high = mid;
             } else {
@@ -83,25 +93,7 @@ pub fn nudge_for_contrast(
         }
     }
 
-    conversions::hsl_to_rgb([hsl[0], hsl[1], if is_lighter { high } else { low }])
-}
-
-fn luminance(rgb: [u8; 3]) -> f32 {
-    let [r, g, b] = rgb.map(|color| color as f32 / 255.0)
-        .map(|normal| if normal <= 0.03928 {
-            normal / 12.92
-        }else {
-            ((normal + 0.055) / 1.055).powf(2.4)
-        });
-
-    0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
-    let la = luminance(a);
-    let lb = luminance(b);
-    let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
-    (hi + 0.05) / (lo + 0.05)
+    best_rgb
 }
 
 fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
@@ -109,8 +101,8 @@ fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
         return Lab {
             l: 0.90,
             a: 0.0,
-            b: 0.0
-        }
+            b: 0.0,
+        };
     }
 
     let mut hsl = conversions::to_hsl(base_color);
@@ -119,4 +111,19 @@ fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
 
     let rgb = conversions::hsl_to_rgb(hsl);
     conversions::rgb_to_oklab(rgb)
+}
+
+pub fn nudge_accent(
+    color: &Lab,
+    background_rgb: [u8; 3],
+    target_ratio: f32,
+    background_is_dark: bool,
+) -> [u8; 3] {
+    let (floor, ceiling) = if background_is_dark {
+        (0.58, 0.85)
+    } else {
+        (0.15, 0.42)
+    };
+
+    nudge_for_contrast(color, background_rgb, target_ratio, floor, ceiling)
 }

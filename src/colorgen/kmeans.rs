@@ -1,4 +1,5 @@
 use image::{DynamicImage, GenericImageView};
+use crate::colorgen::colors::Lab;
 use crate::colorgen::conversions;
 
 const QUANTIZATION_LEVEL: usize = 5;
@@ -119,14 +120,14 @@ pub(crate) fn kmeans(
             }
         }
 
-        if highest_movement < 0.005 {
+        if highest_movement < 0.000004 {
             break
         }
     }
-
+    
+    centroids.retain(|c| c.size > 0.0);
     centroids.sort_by(|a, b| b.size.partial_cmp(&a.size).unwrap());
 
-    centroids.retain(|c| c.size > 0.0);
 
     centroids
 }
@@ -167,38 +168,4 @@ pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
     }
 
     centroids
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Lab {
-    pub l: f32,
-    pub a: f32,
-    pub b: f32,
-}
-
-impl Lab {
-    #[inline]
-    pub fn distance(&self, other: &Self) -> f32 {
-        let dl = self.l - other.l;
-        let da = self.a - other.a;
-        let db = self.b - other.b;
-
-        dl * dl + da * da + db * db
-    }
-
-    pub fn accent_distance_squared(&self, other: &Self) -> f32 {
-        let dl = self.l - other.l;
-        let da = self.a - other.a;
-        let db = self.b - other.b;
-
-        (dl * dl * 0.8) + (da * da * 1.2) + (db * db * 1.2)
-    }
-
-    pub fn chroma(&self) -> f32 {
-        (self.a * self.a + self.b * self.b).sqrt()
-    }
-
-    pub fn contrast(&self, other: &Lab) -> f32 {
-        self.distance(other).sqrt()
-    }
 }
