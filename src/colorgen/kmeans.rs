@@ -124,7 +124,7 @@ pub(crate) fn kmeans(
             break
         }
     }
-    
+
     centroids.retain(|c| c.size > 0.0);
     centroids.sort_by(|a, b| b.size.partial_cmp(&a.size).unwrap());
 
