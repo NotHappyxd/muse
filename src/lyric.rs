@@ -31,12 +31,11 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
 
     let str = match client
         .get("https://lrclib.net/api/get")
+        .header("User-Agent", "muse-rs")
         .query(&params)
         .send()
         .await {
-        Ok(res) => {
-            res.text().await.unwrap_or(String::from(""))
-        },
+        Ok(res) => res.text().await.unwrap_or_default(),
         Err(_) => String::from(""),
     };
 
