@@ -97,15 +97,20 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
         Err(_) => return,
     };
 
-    let active = players
-        .filter_map(Result::ok)
-        .find(|player| {
+    let players_vec: Vec<_> = players.filter_map(Result::ok)
+        .filter(|player| player.bus_name().contains(&config.player)).collect();
+
+    let active = if players_vec.len() <= 1 {
+        players_vec.into_iter().next()
+    }else {
+        players_vec.into_iter().find(|player| {
             let playing = player.get_playback_status().ok()
                 .map(|playback| playback == PlaybackStatus::Playing)
                 .unwrap_or(false);
 
-            playing && player.bus_name().contains(&config.player)
-        });
+            playing
+        })
+    };
 
     match active {
         None => handle_no_player(state, tx),
@@ -146,7 +151,9 @@ fn handle_active_player(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState
         state.current_bus = Some(bus);
     }
 
+    let paused_before_sync = !state.anchor_playing;
     sync_playback_drift(player, state, tx);
+    let was_paused = state.anchor_playing && paused_before_sync;
 
     match player.get_metadata() {
         Err(e) => {
@@ -155,7 +162,7 @@ fn handle_active_player(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState
             });
         }
 
-        Ok(metadata) => handle_metadata(&metadata, state, config, tx)
+        Ok(metadata) => handle_metadata(&metadata, state, config, tx, was_paused)
     }
 }
 
@@ -175,7 +182,21 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
         false
     };
 
-    if new_session || drifted {
+    let paused = match player.get_playback_status() {
+        Ok(PlaybackStatus::Paused) => true,
+        _ => false,
+    };
+
+    if paused {
+        let progress = player.get_position().unwrap_or(Duration::from_millis(0)).as_millis();
+        state.pause_anchor(progress);
+
+        let _ = tx.send(AppEvent::PlaybackAnchor {
+            position_ms: progress,
+            is_playing: false,
+            at: now,
+        });
+    }else if new_session || drifted {
         state.update_anchor(poll_ms, now, true);
 
         let _ = tx.send(AppEvent::PlaybackAnchor {
@@ -186,15 +207,22 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
     }
 }
 
-fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Config, tx: &UnboundedSender<AppEvent>) {
+fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Config, tx: &UnboundedSender<AppEvent>, was_paused: bool) {
     let song_info = SongInfo::from_metadata(metadata);
 
-    let different_title = state.current_title.as_ref() != Some(&song_info.title);
+    let same_title = state.current_title.as_ref() == Some(&song_info.title);
 
-    if !different_title {
+    if same_title {
+        if was_paused && config.color.generate && let Some(art_url) = song_info.art_url {
+            let clusters= config.color.k_clusters;
+            let max_iterations = config.color.max_color_gen_iterations;
+            let channel = tx.clone();
+
+            fetch_theme_task(song_info.title.clone(), art_url, clusters, max_iterations, channel);
+        }
         return;
     }
-    
+
     let valid_album = !song_info.album.is_empty();
     let passed_retry_threshold = state.album_retry >= RETRY_COUNT;
 
@@ -226,14 +254,21 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
         tokio::spawn(async move {
             if generate_theme {
                 let theme_channel = tx2.clone();
-
-                tokio::spawn(fetch_theme(song_info.title.clone(), art_url, theme_channel, k_clusters, max_iterations));
+                fetch_theme_task(song_info.title.clone(), art_url, k_clusters, max_iterations, theme_channel)
             }
 
             let lyrics = fetch_lyric(&song_info.title, &song_info.artists, &song_info.album, song_info.length).await;
             let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
         });
     }
+}
+
+fn fetch_theme_task(song_title: String, art_url: String, k_clusters: u8, max_iterations: u8, tx: UnboundedSender<AppEvent>) {
+    let channel = tx.clone();
+
+    tokio::spawn(async move {
+        fetch_theme(song_title, art_url, &channel, k_clusters, max_iterations).await
+    });
 }
 
 impl WatcherState {
