@@ -36,10 +36,6 @@ impl Lab {
     pub fn chroma(&self) -> f32 {
         (self.a * self.a + self.b * self.b).sqrt()
     }
-
-    pub fn contrast(&self, other: &Lab) -> f32 {
-        self.distance(other).sqrt()
-    }
 }
 
 impl Oklch {

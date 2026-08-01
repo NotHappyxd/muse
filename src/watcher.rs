@@ -194,7 +194,7 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
     if !different_title {
         return;
     }
-
+    
     let valid_album = !song_info.album.is_empty();
     let passed_retry_threshold = state.album_retry >= RETRY_COUNT;
 

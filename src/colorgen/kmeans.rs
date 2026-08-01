@@ -1,6 +1,6 @@
 use image::{DynamicImage, GenericImageView};
 use crate::colorgen::colors::Lab;
-use crate::colorgen::{conversions, scoring};
+use crate::colorgen::{conversions};
 
 const QUANTIZATION_LEVEL: usize = 5;
 const BIN_COUNT: usize = 1 << (QUANTIZATION_LEVEL * 3);

@@ -47,18 +47,6 @@ impl Song {
 
 impl App {
     pub fn new(config: Config) -> Self {
-        let theme = if config.color.generate {
-            None
-        }else {
-            Some(config.color.fallback_main_rgb())
-        };
-
-        let accent = if config.color.generate {
-            None
-        }else {
-            Some(config.color.fallback_accent_rgb())
-        };
-
         Self {
             active_song: None,
             lyrics: None,
