@@ -1,7 +1,8 @@
 use crate::colorgen::colors::{find_max_chroma_oklab, wcag_contrast, Lab, Oklch};
-use crate::colorgen::kmeans::{color_histogram, kmeans, Cluster};
-use crate::colorgen::{colors, conversions};
+use crate::colorgen::kmeans::{color_histogram, kmeans};
+use crate::colorgen::{colors, conversions, scoring};
 use image::DynamicImage;
+use crate::colorgen::scoring::main_score;
 
 pub struct Theme {
     pub main: [u8; 3],
@@ -16,18 +17,20 @@ pub fn generate_from_image(
 ) -> Theme {
     let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
 
-    let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
-
     const MIN_DIST_SQ: f32 = 0.0225;
 
-    let main = clusters.first().unwrap();
+    let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
+
+    let main = clusters.iter().max_by(|a, b| {
+        main_score(a, total_pixels).partial_cmp(&main_score(b, total_pixels)).unwrap()
+    }).unwrap();
+
     let accent = clusters
         .iter()
-        .skip(1)
         .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
         .max_by(|x, y| {
-            accent_score(x, main, total_pixels, account_light)
-                .partial_cmp(&accent_score(y, main, total_pixels, account_light))
+            scoring::accent_score(x, main, total_pixels, account_light)
+                .partial_cmp(&scoring::accent_score(y, main, total_pixels, account_light))
                 .unwrap()
         });
 
@@ -42,15 +45,6 @@ pub fn generate_from_image(
         main: main_color,
         accent: nudge_accent(&accent_lab, main_color, 4.0, true),
     }
-}
-
-fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_light: bool) -> f32 {
-    let chroma = cluster.color.chroma();
-    let contrast = cluster.color.accent_distance_squared(&main.color).sqrt();
-    let lightness_diff = ((cluster.color.l - main.color.l).abs() / 100.0).max(0.2);
-    let size_weight = (cluster.size / total_pixels).sqrt();
-
-    chroma * contrast * size_weight * if account_light { lightness_diff } else { 1.0 }
 }
 
 // https://github.com/Harman1307/iris/blob/main/iris/generator.py#L125

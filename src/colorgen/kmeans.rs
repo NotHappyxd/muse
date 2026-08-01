@@ -1,6 +1,6 @@
 use image::{DynamicImage, GenericImageView};
 use crate::colorgen::colors::Lab;
-use crate::colorgen::conversions;
+use crate::colorgen::{conversions, scoring};
 
 const QUANTIZATION_LEVEL: usize = 5;
 const BIN_COUNT: usize = 1 << (QUANTIZATION_LEVEL * 3);
@@ -128,9 +128,9 @@ pub(crate) fn kmeans(
     centroids.retain(|c| c.size > 0.0);
     centroids.sort_by(|a, b| b.size.partial_cmp(&a.size).unwrap());
 
-
     centroids
 }
+
 
 pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
     let mut centroids: Vec<Cluster> = Vec::with_capacity(k);

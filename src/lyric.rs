@@ -1,4 +1,4 @@
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use crate::cache;
 use crate::cache::find_cache;
 
@@ -29,15 +29,24 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
         ("duration", &length.to_string()),
     ];
 
-    let str = match client
+    let response = client
         .get("https://lrclib.net/api/get")
         .header("User-Agent", "muse-rs")
         .query(&params)
         .send()
-        .await {
-        Ok(res) => res.text().await.unwrap_or_default(),
-        Err(_) => String::from(""),
-    };
+        .await;
+
+    if response.is_err() {
+        return None;
+    }
+
+    let response = response.unwrap();
+
+    if response.status() != StatusCode::OK {
+        return None;
+    }
+
+    let str = response.text().await.unwrap();
 
     if str.is_empty() {
         return Some(LyricResponse {
@@ -66,24 +75,21 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
 }
 
 fn convert_to_timed(str: &str) -> Vec<LyricLine> {
-    let mut lyrics: Vec<LyricLine> = Vec::new();
+    let input = str.strip_prefix('\u{FEFF}').unwrap_or(str);
 
-    for lyric in str.lines() {
-        if let Some(end) = lyric.find(']') {
-            let time = &lyric[1..end];
+    input.lines()
+        .filter_map(|line| {
+            let line = line.strip_prefix('[')?;
+            let end = line.find(']')?;
 
-            let line_text = lyric[end + 1..].trim().to_string();
+            let timestamp = parse_timestamp(&line[..end])?;
+            let text = line[end + 1..].trim().to_owned();
 
-            if let Some(timestamp) = parse_timestamp(time) {
-                lyrics.push(LyricLine {
-                    timestamp,
-                    line: line_text
-                });
-            }
-        }
-    }
-
-    lyrics
+            Some(LyricLine {
+                timestamp,
+                line: text,
+            })
+        }).collect()
 }
 
 fn parse_timestamp(ts: &str) -> Option<u64> {
