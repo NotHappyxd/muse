@@ -1,12 +1,18 @@
+use crate::colorgen::conversions;
 use crate::colorgen::kmeans::Cluster;
 
 pub fn main_score(cluster: &Cluster, total_pixels: f32) -> f32 {
-    let size_weight = cluster.size / total_pixels;
+    const CHROMA_WEIGHT: f32 = 0.3;
+    const SATURATION_WEIGHT: f32 = 0.2;
+    const PRESENCE_WEIGHT: f32 = 0.5;
+
+    let presence = cluster.size / total_pixels;
     let chroma = cluster.color.chroma();
+    let saturation = conversions::to_hsl(&cluster.color)[1];
 
-    let saturation_boost = 0.2 + 0.8 * (chroma / (chroma + 0.05));
-
-    size_weight * saturation_boost
+    (CHROMA_WEIGHT * chroma)
+        + (SATURATION_WEIGHT * saturation * 100.0)
+        + (PRESENCE_WEIGHT * presence * 100.0)
 }
 
 pub fn accent_score(cluster: &Cluster, main: &Cluster, total_pixels: f32, account_light: bool) -> f32 {

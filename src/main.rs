@@ -56,55 +56,7 @@ fn run_ui(
 
     loop {
         while let Ok(event) = rx.try_recv() {
-            match event {
-                AppEvent::SongChanged {
-                    title,
-                    album,
-                    artists,
-                    length,
-                } => {
-                    let song = Song::new(title, album, artists, length);
-
-                    app.active_song = Some(song);
-
-                    if app.config.color.generate {
-                        let song = app.active_song.as_ref().unwrap();
-
-                        if app.theme.title.as_ref() != Some(&song.title) {
-                            app.theme.title = None;
-                            app.theme.main = None;
-                            app.theme.accent = None;
-                        }
-                    }
-
-                    app.lyrics = None;
-                    app.manual_scroll_offset = Cell::new(0);
-                }
-
-                AppEvent::PlaybackAnchor { position_ms, is_playing, at } => {
-                    app.set_progress(position_ms, is_playing, at)
-                }
-
-                AppEvent::PlayerDetached => {}
-
-                AppEvent::Error { error: _error } => {
-                    panic!("{}", _error)
-                }
-
-                AppEvent::LyricsFetched { lyrics } => {
-                    app.lyrics = lyrics;
-                }
-
-                AppEvent::Idle => {},
-                AppEvent::PlayerCommand(command) => {
-                    handle_player_command(command)
-                },
-                AppEvent::ThemeFetched { song_title, rgb, accent } => {
-                    app.theme.title = Some(song_title);
-                    app.theme.main = Some(rgb);
-                    app.theme.accent = Some(accent);
-                }
-            }
+            handle_event(event, &mut app)
         }
 
         terminal.draw(|frame| {
@@ -128,6 +80,58 @@ fn run_ui(
     }
 
     Ok(())
+}
+
+fn handle_event(event: AppEvent, app: &mut App) {
+    match event {
+        AppEvent::SongChanged {
+            title,
+            album,
+            artists,
+            length,
+        } => {
+            let song = Song::new(title, album, artists, length);
+
+            app.active_song = Some(song);
+
+            if app.config.color.generate {
+                let song = app.active_song.as_ref().unwrap();
+
+                if app.theme.title.as_ref() != Some(&song.title) {
+                    app.theme.title = None;
+                    app.theme.main = None;
+                    app.theme.accent = None;
+                }
+            }
+
+            app.lyrics = None;
+            app.manual_scroll_offset = Cell::new(0);
+        }
+
+        AppEvent::PlaybackAnchor { position_ms, is_playing, at } => {
+            app.set_progress(position_ms, is_playing, at)
+        }
+
+        AppEvent::PlayerDetached => {}
+
+        AppEvent::Error { error: _error } => {
+            panic!("{}", _error)
+        }
+
+        AppEvent::LyricsFetched { lyrics } => {
+            app.lyrics = lyrics;
+        }
+
+        AppEvent::Idle => {},
+        AppEvent::PlayerCommand(command) => {
+            handle_player_command(command)
+        },
+        AppEvent::ThemeFetched { song_title, rgb, accent } => {
+            app.theme.title = Some(song_title);
+            app.theme.main = Some(rgb);
+            app.theme.accent = Some(accent);
+        }
+    }
 }
 
 fn handle_player_command(cmd: PlayerCommand) {
