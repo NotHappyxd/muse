@@ -43,14 +43,14 @@ pub enum PlayerCommand {
 }
 const POLL_MS: u64 = 500;
 const MAXIMUM_DRIFT_ALLOWED: i128 = 750;
-const RETRY_COUNT: u32 = 3;
+const RETRY_COUNT: u8 = 3;
 
 #[derive(Default)]
 struct WatcherState {
     current_title: Option<String>,
     current_bus: Option<String>,
     current_album: Option<String>,
-    album_retry: u32,
+    album_retry: u8,
     anchor_position: Option<u128>,
     anchor_instant: Option<Instant>,
     anchor_playing: bool,
@@ -216,9 +216,8 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
         if was_paused && config.color.generate && let Some(art_url) = song_info.art_url {
             let clusters= config.color.k_clusters;
             let max_iterations = config.color.max_color_gen_iterations;
-            let channel = tx.clone();
 
-            fetch_theme_task(song_info.title.clone(), art_url, clusters, max_iterations, channel);
+            fetch_theme_task(song_info.title.clone(), art_url, clusters, max_iterations, tx);
         }
         return;
     }
@@ -247,23 +246,23 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
     if let Some(art_url) = song_info.art_url {
         let tx2 = tx.clone();
 
-        let k_clusters = config.color.k_clusters;
-        let max_iterations = config.color.max_color_gen_iterations;
         let generate_theme = config.color.generate;
 
-        tokio::spawn(async move {
-            if generate_theme {
-                let theme_channel = tx2.clone();
-                fetch_theme_task(song_info.title.clone(), art_url, k_clusters, max_iterations, theme_channel)
-            }
+        if generate_theme {
+            let k_clusters = config.color.k_clusters;
+            let max_iterations = config.color.max_color_gen_iterations;
 
+            fetch_theme_task(song_info.title.clone(), art_url, k_clusters, max_iterations, tx)
+        }
+
+        tokio::spawn(async move {
             let lyrics = fetch_lyric(&song_info.title, &song_info.artists, &song_info.album, song_info.length).await;
             let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
         });
     }
 }
 
-fn fetch_theme_task(song_title: String, art_url: String, k_clusters: u8, max_iterations: u8, tx: UnboundedSender<AppEvent>) {
+fn fetch_theme_task(song_title: String, art_url: String, k_clusters: u8, max_iterations: u8, tx: &UnboundedSender<AppEvent>) {
     let channel = tx.clone();
 
     tokio::spawn(async move {

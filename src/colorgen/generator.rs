@@ -21,9 +21,11 @@ pub fn generate_from_image(
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
-    let main = clusters.iter().max_by(|a, b| {
+    let main = clusters.iter()
+        .filter(|c| c.color.chroma() >= 0.03)
+        .max_by(|a, b| {
         main_score(a, total_pixels).partial_cmp(&main_score(b, total_pixels)).unwrap()
-    }).unwrap();
+    }).unwrap_or(clusters.first().unwrap());
 
     let accent = clusters
         .iter()

@@ -93,9 +93,11 @@ pub(crate) fn kmeans(
                 }
             }
 
-            sums[index].l += color.l * weight;
-            sums[index].a += color.a * weight;
-            sums[index].b += color.b * weight;
+            let sum = &mut sums[index];
+
+            sum.l += color.l * weight;
+            sum.a += color.a * weight;
+            sum.b += color.b * weight;
             weights[index] += *count;
         }
 
