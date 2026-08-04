@@ -15,6 +15,21 @@ Muse hooks into MPRIS (Linux-only) to detect the currently playing song, fetches
 ## Installation
 Binaries are included in the release tab, however for the most up to date version, you need to build from source.
 
+### Pre-built Binary
+Download the tar.gz, then run 
+```bash
+tar -xzf muse-v{version}-{architecture}.tar.gz
+cd muse-v{version}-{architecture}
+cp muse ~/.local/bin/muse
+```
+
+If muse doesn't work from the console, you may need to add ~/.local/bin/ to your PATH. Enter your shell file (.bashrc or .zshrc) and add the line 
+
+```
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### From Source
 Clone the project, build it in release mode, and copy the binary into your bin folder.
 
 ```bash
