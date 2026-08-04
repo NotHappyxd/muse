@@ -13,6 +13,8 @@ Muse hooks into MPRIS (Linux-only) to detect the currently playing song, fetches
 * ⚡ Lightweight(-ish) terminal user interface
 
 ## Installation
+Binaries are included in the release tab, however for the most up to date version, you need to build from source.
+
 Clone the project, build it in release mode, and copy the binary into your bin folder.
 
 ```bash
