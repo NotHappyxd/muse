@@ -37,22 +37,19 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
         .await;
 
     if response.is_err() {
-        return None;
+       return Some(LyricResponse::empty(title));
     }
 
     let response = response.unwrap();
 
     if response.status() != StatusCode::OK {
-        return None;
+        return Some(LyricResponse::empty(title));
     }
 
     let str = response.text().await.unwrap();
 
     if str.is_empty() {
-        return Some(LyricResponse {
-            song: title.to_string(),
-            lyrics: vec![]
-        })
+        return Some(LyricResponse::empty(title));
     }
 
     let json_data: serde_json::Value = serde_json::from_str(&str).unwrap_or_default();
@@ -107,4 +104,13 @@ fn parse_timestamp(ts: &str) -> Option<u64> {
     };
 
     Some(minutes * 60_000 + seconds * 1_000 + millis)
+}
+
+impl LyricResponse {
+    pub fn empty(title: &str) -> LyricResponse {
+        Self {
+            song: title.to_owned(),
+            lyrics: vec![]
+        }
+    }
 }
