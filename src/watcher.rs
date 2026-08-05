@@ -4,6 +4,7 @@ use mpris::{Metadata, PlaybackStatus, Player, PlayerFinder};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
+use crate::config;
 use crate::config::Config;
 
 #[derive(Debug)]
@@ -214,10 +215,7 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
 
     if same_title {
         if was_paused && config.color.generate && let Some(art_url) = song_info.art_url {
-            let clusters= config.color.k_clusters;
-            let max_iterations = config.color.max_color_gen_iterations;
-
-            fetch_theme_task(song_info.title.clone(), art_url, clusters, max_iterations, tx);
+            fetch_theme_task(song_info.title.clone(), art_url, &config.color, tx);
         }
         return;
     }
@@ -249,10 +247,7 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
         let generate_theme = config.color.generate;
 
         if generate_theme {
-            let k_clusters = config.color.k_clusters;
-            let max_iterations = config.color.max_color_gen_iterations;
-
-            fetch_theme_task(song_info.title.clone(), art_url, k_clusters, max_iterations, tx)
+            fetch_theme_task(song_info.title.clone(), art_url, &config.color, tx)
         }
 
         tokio::spawn(async move {
@@ -262,11 +257,14 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
     }
 }
 
-fn fetch_theme_task(song_title: String, art_url: String, k_clusters: u8, max_iterations: u8, tx: &UnboundedSender<AppEvent>) {
+fn fetch_theme_task(song_title: String, art_url: String, color: &config::Color, tx: &UnboundedSender<AppEvent>) {
     let channel = tx.clone();
+    let k_clusters = color.k_clusters;
+    let max_iterations = color.max_color_gen_iterations;
+    let min_chroma = color.min_chroma;
 
     tokio::spawn(async move {
-        fetch_theme(song_title, art_url, &channel, k_clusters, max_iterations).await
+        fetch_theme(song_title, art_url, &channel, k_clusters, max_iterations, min_chroma).await
     });
 }
 

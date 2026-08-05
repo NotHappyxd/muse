@@ -13,6 +13,7 @@ pub fn generate_from_image(
     image: &DynamicImage,
     k_clusters: usize,
     max_iterations: usize,
+    min_chroma: f32,
     account_light: bool,
 ) -> Theme {
     let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
@@ -22,7 +23,7 @@ pub fn generate_from_image(
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
     let main = clusters.iter()
-        .filter(|c| c.color.chroma() >= 0.03)
+        .filter(|c| c.color.chroma() >= min_chroma)
         .max_by(|a, b| {
         main_score(a, total_pixels).partial_cmp(&main_score(b, total_pixels)).unwrap()
     }).unwrap_or(clusters.first().unwrap());
@@ -30,6 +31,7 @@ pub fn generate_from_image(
     let accent = clusters
         .iter()
         .filter(|c| c.color.distance(&main.color) > MIN_DIST_SQ)
+        .filter(|c| c.color.chroma() >= min_chroma)
         .max_by(|x, y| {
             scoring::accent_score(x, main, total_pixels, account_light)
                 .partial_cmp(&scoring::accent_score(y, main, total_pixels, account_light))

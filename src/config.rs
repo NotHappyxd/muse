@@ -24,6 +24,7 @@ pub struct Color {
     pub generate: bool,
     pub k_clusters: u8,
     pub max_color_gen_iterations: u8,
+    pub min_chroma: f32,
     pub fallback_main: String,
     pub fallback_accent: String,
 }
@@ -58,6 +59,7 @@ impl Default for Color {
         Color {
             generate: true,
             k_clusters: 14,
+            min_chroma: 0.02,
             max_color_gen_iterations: 30,
             fallback_main: "#afd75f".to_owned(),
             fallback_accent: "#ffffff".to_owned()
