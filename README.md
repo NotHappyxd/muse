@@ -59,6 +59,10 @@ Muse also caches lyric responses at:
 
 To clear the cache, delete this folder or remove individual song cache files.
 
+## Planned Features
+- [ ] Support lyrics file format
+- [ ] Theme inactive lyric lines based off album art
+
 ## Acknowledgements
 * The UI and core idea for this project were inspired by snoowfall's [Lyse](https://github.com/snoowfall/lyse/).
 * Cluster scoring and color nudging were based on Harman1307's [iris](https://github.com/Harman1307/iris).
