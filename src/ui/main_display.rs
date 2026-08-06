@@ -54,11 +54,10 @@ impl App {
             return;
         };
 
-        let accent = Color::from(
-            self.theme
-                .accent
-                .unwrap_or(self.config.color.fallback_accent_rgb()),
-        );
+        let accent = self.theme.accent
+            .map(Color::from)
+            .unwrap_or(Color::from(self.config.color.fallback_accent_rgb()));
+
         let alignment = if self.config.lyric_settings.center {
             Alignment::Center
         } else {
@@ -91,7 +90,13 @@ impl App {
             return;
         }
 
+        self.display_lyrics(area, buf, accent, alignment)
+    }
+
+    fn display_lyrics(&self, area: Rect, buf: &mut Buffer, accent: Color, alignment: Alignment) {
         let current_ms = self.current_progress();
+
+        let synced_lyrics = &self.lyrics.as_ref().unwrap().lyrics;
 
         let active_idx = synced_lyrics
             .iter()
