@@ -1,5 +1,5 @@
-use std::fs;
 use expanduser::expanduser;
+use std::fs;
 
 const CACHE_DIRECTORY: &'static str = "~/.cache/muse";
 
@@ -41,8 +41,8 @@ pub fn write_to_cache(key: &str, contents: &str) -> bool {
 
         return match fs::write(&parent, contents) {
             Ok(_) => true,
-            Err(_) => false
-        }
+            Err(_) => false,
+        };
     }
 
     false

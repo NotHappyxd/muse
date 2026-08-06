@@ -1,23 +1,28 @@
-use reqwest::{Client, StatusCode};
 use crate::cache;
 use crate::cache::find_cache;
+use reqwest::{Client, StatusCode};
 
 #[derive(Debug, Clone)]
 pub struct LyricLine {
     pub timestamp: u64,
-    pub line: String
+    pub line: String,
 }
 #[derive(Debug, Clone)]
 pub struct LyricResponse {
     pub song: String,
-    pub lyrics: Vec<LyricLine>
+    pub lyrics: Vec<LyricLine>,
 }
 
-pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length: u32) -> Option<LyricResponse> {
+pub async fn fetch_lyric(
+    title: &str,
+    artists: &Vec<String>,
+    album: &str,
+    length: u32,
+) -> Option<LyricResponse> {
     if let Some(content) = find_cache(title, artists) {
         return Some(LyricResponse {
             song: title.to_string(),
-            lyrics: convert_to_timed(&content)
+            lyrics: convert_to_timed(&content),
         });
     }
     let client = Client::new();
@@ -37,7 +42,7 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
         .await;
 
     if response.is_err() {
-       return Some(LyricResponse::empty(title));
+        return Some(LyricResponse::empty(title));
     }
 
     let response = response.unwrap();
@@ -61,20 +66,21 @@ pub async fn fetch_lyric(title: &str, artists: &Vec<String>, album: &str, length
 
         return Some(LyricResponse {
             song: title.to_string(),
-            lyrics
-        })
+            lyrics,
+        });
     }
 
     Some(LyricResponse {
         song: title.to_string(),
-        lyrics: vec![]
+        lyrics: vec![],
     })
 }
 
 fn convert_to_timed(str: &str) -> Vec<LyricLine> {
     let input = str.strip_prefix('\u{FEFF}').unwrap_or(str);
 
-    input.lines()
+    input
+        .lines()
         .filter_map(|line| {
             let line = line.strip_prefix('[')?;
             let end = line.find(']')?;
@@ -86,7 +92,8 @@ fn convert_to_timed(str: &str) -> Vec<LyricLine> {
                 timestamp,
                 line: text,
             })
-        }).collect()
+        })
+        .collect()
 }
 
 fn parse_timestamp(ts: &str) -> Option<u64> {
@@ -110,7 +117,7 @@ impl LyricResponse {
     pub fn empty(title: &str) -> LyricResponse {
         Self {
             song: title.to_owned(),
-            lyrics: vec![]
+            lyrics: vec![],
         }
     }
 }

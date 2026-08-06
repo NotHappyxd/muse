@@ -14,7 +14,6 @@ pub struct Oklch {
     pub h: f32,
 }
 
-
 impl Lab {
     #[inline]
     pub fn distance(&self, other: &Self) -> f32 {
@@ -35,6 +34,11 @@ impl Lab {
 
     pub fn chroma(&self) -> f32 {
         (self.a * self.a + self.b * self.b).sqrt()
+    }
+
+    pub fn scale_chroma(&mut self, chroma: f32) {
+        self.a *= chroma;
+        self.b *= chroma;
     }
 }
 
@@ -65,9 +69,13 @@ pub fn find_max_chroma_oklab(mut lch: Oklch) -> Lab {
         let lab = lch.to_oklab();
         let linear = conversions::oklab_to_linear_srgb(&lab);
 
-        if linear[0] >= 0.0 && linear[0] <= 1.0
-            && linear[1] >= 0.0 && linear[1] <= 1.0
-            && linear[2] >= 0.0 && linear[2] <= 1.0 {
+        if linear[0] >= 0.0
+            && linear[0] <= 1.0
+            && linear[1] >= 0.0
+            && linear[1] <= 1.0
+            && linear[2] >= 0.0
+            && linear[2] <= 1.0
+        {
             best_lab = lab;
             low_c = mid_c; // Push chroma higher!
         } else {
@@ -79,12 +87,13 @@ pub fn find_max_chroma_oklab(mut lch: Oklch) -> Lab {
 }
 
 pub fn luminance(rgb: [u8; 3]) -> f32 {
-    let [r, g, b] = rgb.map(|color| color as f32 / 255.0)
-        .map(|normal| if normal <= 0.03928 {
+    let [r, g, b] = rgb.map(|color| color as f32 / 255.0).map(|normal| {
+        if normal <= 0.03928 {
             normal / 12.92
-        }else {
+        } else {
             ((normal + 0.055) / 1.055).powf(2.4)
-        });
+        }
+    });
 
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }

@@ -1,54 +1,47 @@
+use crate::ui::state::App;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Layout, Rect};
 use ratatui::layout::Constraint::{Fill, Length};
+use ratatui::layout::{Alignment, Layout, Rect};
 use ratatui::prelude::Text;
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::widgets::{LineGauge, Paragraph, Widget};
-use crate::ui::state::App;
 
 impl App {
     pub(crate) fn render_gauge(&self, area: Rect, buf: &mut Buffer) {
         let progress = self.current_progress();
         let label = format_millis(progress);
 
-        let layout = Layout::horizontal([
-            Length(label.len() as u16),
-            Fill(1),
-            Length(8),
-        ]);
+        let layout = Layout::horizontal([Length(label.len() as u16), Fill(1), Length(8)]);
 
-        let [label_area, gauge_area, end_area] =
-            area.layout(&layout);
+        let [label_area, gauge_area, end_area] = area.layout(&layout);
 
-        Text::from(label)
-            .centered()
-            .render(label_area, buf);
+        Text::from(label).centered().render(label_area, buf);
 
         let song_length = match self.active_song.as_ref() {
             Some(song) => song.length,
-            None => 0
+            None => 0,
         };
 
-        let ratio = if song_length == 0 { 0.0 } else { progress as f64 / (song_length * 1000) as f64 };
+        let ratio = if song_length == 0 {
+            0.0
+        } else {
+            progress as f64 / (song_length * 1000) as f64
+        };
 
-        let [r, g, b] = self.theme.main.unwrap_or(self.config.color.fallback_main_rgb());
+        let [r, g, b] = self
+            .theme
+            .main
+            .unwrap_or(self.config.color.fallback_main_rgb());
 
         let filled_style = Color::from([r, g, b]);
         let unfilled_style = Color::from([r / 3, g / 3, b / 3]);
 
         LineGauge::default()
             .label("")
-            .filled_style(
-                Style::default()
-                    .fg(filled_style)
-            )
-            .unfilled_style(
-                Style::default()
-                    .fg(unfilled_style)
-            )
+            .filled_style(Style::default().fg(filled_style))
+            .unfilled_style(Style::default().fg(unfilled_style))
             .ratio(ratio.clamp(0.0, 1.0))
             .render(gauge_area, buf);
-
 
         Text::raw(format!(" {}", format_second(song_length)))
             .bold()
@@ -58,13 +51,17 @@ impl App {
 
     pub(crate) fn render_lyrics(&self, area: Rect, buf: &mut Buffer) {
         let Some(active_song) = &self.active_song else {
-            return
+            return;
         };
-        
-        let accent = Color::from(self.theme.accent.unwrap_or(self.config.color.fallback_accent_rgb()));
+
+        let accent = Color::from(
+            self.theme
+                .accent
+                .unwrap_or(self.config.color.fallback_accent_rgb()),
+        );
         let alignment = if self.config.lyric_settings.center {
             Alignment::Center
-        }else {
+        } else {
             Alignment::Left
         };
 
@@ -103,17 +100,24 @@ impl App {
 
         let mut lines = Vec::new();
 
+        let mix = self.theme.mix_colors();
+        let modifier = if self.config.color.dim_inactive_lines {
+            Modifier::DIM
+        } else {
+            Modifier::BOLD
+        };
+
         for (i, lyric) in synced_lyrics.iter().enumerate() {
             let mut text = lyric.line.clone();
 
             let style = if i < active_idx {
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::DIM)
+                Style::default().fg(mix[0]).add_modifier(modifier)
             } else if i == active_idx {
                 text.insert_str(0, &self.config.lyric_settings.active_prefix);
 
                 Style::default().fg(accent).bold()
             } else {
-                Style::default().fg(Color::Gray).add_modifier(Modifier::DIM)
+                Style::default().fg(mix[1]).add_modifier(modifier)
             };
 
             lines.push(ratatui::text::Line::from(text).style(style));

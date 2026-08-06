@@ -1,11 +1,12 @@
-use crate::lyric::{LyricResponse, fetch_lyric};
+use crate::colorgen::generator::Theme;
+use crate::config;
+use crate::config::Config;
+use crate::lyric::{fetch_lyric, LyricResponse};
 use crate::theme::fetch_theme;
 use mpris::{Metadata, PlaybackStatus, Player, PlayerFinder};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
-use crate::config;
-use crate::config::Config;
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -31,8 +32,7 @@ pub enum AppEvent {
     PlayerCommand(PlayerCommand),
     ThemeFetched {
         song_title: String,
-        rgb: [u8; 3],
-        accent: [u8; 3],
+        theme: Theme,
     },
 }
 
@@ -65,7 +65,11 @@ struct SongInfo {
     art_url: Option<String>,
 }
 
-pub async fn run_watcher(tx: UnboundedSender<AppEvent>, mut shutdown_rx: Receiver<bool>, config: &Config) {
+pub async fn run_watcher(
+    tx: UnboundedSender<AppEvent>,
+    mut shutdown_rx: Receiver<bool>,
+    config: &Config,
+) {
     let mut state = WatcherState::default();
 
     loop {
@@ -98,14 +102,18 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
         Err(_) => return,
     };
 
-    let players_vec: Vec<_> = players.filter_map(Result::ok)
-        .filter(|player| player.bus_name().contains(&config.player)).collect();
+    let players_vec: Vec<_> = players
+        .filter_map(Result::ok)
+        .filter(|player| player.bus_name().contains(&config.player))
+        .collect();
 
     let active = if players_vec.len() <= 1 {
         players_vec.into_iter().next()
-    }else {
+    } else {
         players_vec.into_iter().find(|player| {
-            let playing = player.get_playback_status().ok()
+            let playing = player
+                .get_playback_status()
+                .ok()
                 .map(|playback| playback == PlaybackStatus::Playing)
                 .unwrap_or(false);
 
@@ -115,7 +123,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
 
     match active {
         None => handle_no_player(state, tx),
-        Some(player) => handle_active_player(tx, state, &player, config)
+        Some(player) => handle_active_player(tx, state, &player, config),
     }
 }
 
@@ -140,7 +148,12 @@ fn handle_no_player(state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
     let _ = tx.send(AppEvent::Idle);
 }
 
-fn handle_active_player(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, player: &Player, config: &Config) {
+fn handle_active_player(
+    tx: &UnboundedSender<AppEvent>,
+    state: &mut WatcherState,
+    player: &Player,
+    config: &Config,
+) {
     let bus = player.bus_name().to_owned();
 
     if state.current_bus.as_deref() != Some(&bus) {
@@ -163,7 +176,7 @@ fn handle_active_player(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState
             });
         }
 
-        Ok(metadata) => handle_metadata(&metadata, state, config, tx, was_paused)
+        Ok(metadata) => handle_metadata(&metadata, state, config, tx, was_paused),
     }
 }
 
@@ -189,7 +202,10 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
     };
 
     if paused {
-        let progress = player.get_position().unwrap_or(Duration::from_millis(0)).as_millis();
+        let progress = player
+            .get_position()
+            .unwrap_or(Duration::from_millis(0))
+            .as_millis();
         state.pause_anchor(progress);
 
         let _ = tx.send(AppEvent::PlaybackAnchor {
@@ -197,7 +213,7 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
             is_playing: false,
             at: now,
         });
-    }else if new_session || drifted {
+    } else if new_session || drifted {
         state.update_anchor(poll_ms, now, true);
 
         let _ = tx.send(AppEvent::PlaybackAnchor {
@@ -208,13 +224,22 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
     }
 }
 
-fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Config, tx: &UnboundedSender<AppEvent>, was_paused: bool) {
+fn handle_metadata(
+    metadata: &Metadata,
+    state: &mut WatcherState,
+    config: &Config,
+    tx: &UnboundedSender<AppEvent>,
+    was_paused: bool,
+) {
     let song_info = SongInfo::from_metadata(metadata);
 
     let same_title = state.current_title.as_ref() == Some(&song_info.title);
 
     if same_title {
-        if was_paused && config.color.generate && let Some(art_url) = song_info.art_url {
+        if was_paused
+            && config.color.generate
+            && let Some(art_url) = song_info.art_url
+        {
             fetch_theme_task(song_info.title.clone(), art_url, &config.color, tx);
         }
         return;
@@ -251,20 +276,39 @@ fn handle_metadata(metadata: &Metadata, state: &mut WatcherState, config: &Confi
         }
 
         tokio::spawn(async move {
-            let lyrics = fetch_lyric(&song_info.title, &song_info.artists, &song_info.album, song_info.length).await;
+            let lyrics = fetch_lyric(
+                &song_info.title,
+                &song_info.artists,
+                &song_info.album,
+                song_info.length,
+            )
+            .await;
             let _ = tx2.send(AppEvent::LyricsFetched { lyrics });
         });
     }
 }
 
-fn fetch_theme_task(song_title: String, art_url: String, color: &config::Color, tx: &UnboundedSender<AppEvent>) {
+fn fetch_theme_task(
+    song_title: String,
+    art_url: String,
+    color: &config::Color,
+    tx: &UnboundedSender<AppEvent>,
+) {
     let channel = tx.clone();
     let k_clusters = color.k_clusters;
     let max_iterations = color.max_color_gen_iterations;
     let min_chroma = color.min_chroma;
 
     tokio::spawn(async move {
-        fetch_theme(song_title, art_url, &channel, k_clusters, max_iterations, min_chroma).await
+        fetch_theme(
+            song_title,
+            art_url,
+            &channel,
+            k_clusters,
+            max_iterations,
+            min_chroma,
+        )
+        .await
     });
 }
 
@@ -303,9 +347,11 @@ impl WatcherState {
 impl SongInfo {
     fn from_metadata(metadata: &Metadata) -> Self {
         let title = metadata.title().unwrap_or("Unknown").to_owned();
-        let album = metadata.album_name()
+        let album = metadata
+            .album_name()
             .filter(|a| !a.trim().is_empty() && *a != "Unknown")
-            .map(|a| a.to_owned()).unwrap_or_default();
+            .map(|a| a.to_owned())
+            .unwrap_or_default();
         let artists = metadata
             .artists()
             .unwrap_or_default()
@@ -323,7 +369,7 @@ impl SongInfo {
             album,
             artists,
             length,
-            art_url
+            art_url,
         }
     }
 }

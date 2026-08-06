@@ -1,5 +1,5 @@
-pub mod kmeans;
+pub mod colors;
 pub mod conversions;
 pub mod generator;
-pub mod colors;
+pub mod kmeans;
 pub mod scoring;

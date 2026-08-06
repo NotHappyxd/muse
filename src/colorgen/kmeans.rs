@@ -1,6 +1,6 @@
-use image::{DynamicImage, GenericImageView};
 use crate::colorgen::colors::Lab;
-use crate::colorgen::{conversions};
+use crate::colorgen::conversions;
+use image::{DynamicImage, GenericImageView};
 
 const QUANTIZATION_LEVEL: usize = 5;
 const BIN_COUNT: usize = 1 << (QUANTIZATION_LEVEL * 3);
@@ -56,20 +56,19 @@ pub fn color_histogram(img: &DynamicImage) -> Vec<(Lab, f32)> {
     bins.into_iter()
         .filter(|b| b.weight > 0.0)
         .map(|b| {
-            (Lab {
-                l: b.l_sum / b.weight,
-                a: b.a_sum / b.weight,
-                b: b.b_sum / b.weight,
-            }, b.weight)
+            (
+                Lab {
+                    l: b.l_sum / b.weight,
+                    a: b.a_sum / b.weight,
+                    b: b.b_sum / b.weight,
+                },
+                b.weight,
+            )
         })
         .collect()
 }
 
-pub(crate) fn kmeans(
-    histogram: &[(Lab, f32)],
-    k: usize,
-    max_iterations: usize,
-) -> Vec<Cluster> {
+pub(crate) fn kmeans(histogram: &[(Lab, f32)], k: usize, max_iterations: usize) -> Vec<Cluster> {
     let mut centroids: Vec<Cluster> = select_centroids(histogram, k);
 
     let mut sums = vec![Lab::default(); k];
@@ -117,13 +116,13 @@ pub(crate) fn kmeans(
 
                 centroids[i].color = color;
                 centroids[i].size = weights[i];
-            }else {
+            } else {
                 centroids[i].size = 0.0;
             }
         }
 
         if highest_movement < 0.000004 {
-            break
+            break;
         }
     }
 
@@ -132,7 +131,6 @@ pub(crate) fn kmeans(
 
     centroids
 }
-
 
 pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
     let mut centroids: Vec<Cluster> = Vec::with_capacity(k);
@@ -152,7 +150,11 @@ pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
         .collect();
 
     for _ in 1..k {
-        let total: f32 = min_d2.iter().zip(histogram).map(|(d2, (_, c))| d2 * c).sum();
+        let total: f32 = min_d2
+            .iter()
+            .zip(histogram)
+            .map(|(d2, (_, c))| d2 * c)
+            .sum();
         let mut threshold = fastrand::f32() * total;
         let mut chosen = histogram.len() - 1;
         for (i, (d2, (_, c))) in min_d2.iter().zip(histogram).enumerate() {
@@ -164,7 +166,10 @@ pub fn select_centroids(histogram: &[(Lab, f32)], k: usize) -> Vec<Cluster> {
         }
 
         let new_centroid = histogram[chosen].0;
-        centroids.push(Cluster { color: new_centroid, size: 0.0 });
+        centroids.push(Cluster {
+            color: new_centroid,
+            size: 0.0,
+        });
 
         for (d2, (color, _)) in min_d2.iter_mut().zip(histogram) {
             let d = color.distance(&new_centroid);

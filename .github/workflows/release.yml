@@ -87,9 +87,25 @@ jobs:
           mkdir upload
           find release-assets -type f -exec cp {} upload/ \;
 
+      - name: Generate commit list
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+
+          {
+            echo "## Commits"
+            echo
+
+            if [ -n "$PREV_TAG" ]; then
+              git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)"
+            else
+              git log --pretty=format:"- %s (%h)"
+            fi
+          } > RELEASE_NOTES.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true
           files: upload/*

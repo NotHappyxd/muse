@@ -1,6 +1,6 @@
-use std::fs;
 use expanduser::expanduser;
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
@@ -8,14 +8,14 @@ pub struct Config {
     pub player: String,
     pub header: Header,
     pub color: Color,
-    pub lyric_settings: LyricSettings
+    pub lyric_settings: LyricSettings,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct Header {
     pub title: String,
-    pub centered: bool
+    pub centered: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -27,20 +27,22 @@ pub struct Color {
     pub min_chroma: f32,
     pub fallback_main: String,
     pub fallback_accent: String,
+    pub theme_inactive_lines: bool,
+    pub dim_inactive_lines: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct LyricSettings {
     pub active_prefix: String,
-    pub center: bool
+    pub center: bool,
 }
 
 impl Default for LyricSettings {
     fn default() -> Self {
         LyricSettings {
             active_prefix: "".to_owned(),
-            center: true
+            center: true,
         }
     }
 }
@@ -62,7 +64,9 @@ impl Default for Color {
             min_chroma: 0.02,
             max_color_gen_iterations: 30,
             fallback_main: "#afd75f".to_owned(),
-            fallback_accent: "#ffffff".to_owned()
+            fallback_accent: "#ffffff".to_owned(),
+            theme_inactive_lines: true,
+            dim_inactive_lines: true,
         }
     }
 }
@@ -91,9 +95,7 @@ pub fn init() -> Config {
 
     path.push("config.toml");
 
-    let config = fs::read(&path)
-        .ok()
-        .and_then(|b| toml::from_slice(&b).ok());
+    let config = fs::read(&path).ok().and_then(|b| toml::from_slice(&b).ok());
 
     match config {
         Some(cfg) => cfg,
@@ -106,7 +108,6 @@ pub fn init() -> Config {
 }
 
 impl Color {
-
     pub fn fallback_main_rgb(&self) -> [u8; 3] {
         Self::hex_to_rgb(&self.fallback_main)
             .ok()
@@ -126,11 +127,13 @@ impl Color {
             return Err("Hex string must be exactly 6 characters long");
         }
 
-        let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| "Invalid hex character in Red component")?;
-        let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| "Invalid hex character in Green component")?;
-        let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| "Invalid hex character in Blue component")?;
+        let r = u8::from_str_radix(&hex[0..2], 16)
+            .map_err(|_| "Invalid hex character in Red component")?;
+        let g = u8::from_str_radix(&hex[2..4], 16)
+            .map_err(|_| "Invalid hex character in Green component")?;
+        let b = u8::from_str_radix(&hex[4..6], 16)
+            .map_err(|_| "Invalid hex character in Blue component")?;
 
         Ok([r, g, b])
     }
-
 }

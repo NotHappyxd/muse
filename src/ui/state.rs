@@ -1,9 +1,10 @@
-use std::cell::Cell;
-use std::time::Instant;
-use tokio::sync::mpsc::UnboundedSender;
 use crate::config::Config;
 use crate::lyric::LyricResponse;
 use crate::watcher::AppEvent;
+use ratatui::style::Color;
+use std::cell::Cell;
+use std::time::Instant;
+use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct Song {
@@ -24,7 +25,7 @@ pub struct App {
     pub quit: bool,
     pub manual_scroll_offset: Cell<i16>,
     pub tx: Option<UnboundedSender<AppEvent>>,
-    pub config: Config
+    pub config: Config,
 }
 
 #[derive(Default, Debug)]
@@ -32,6 +33,8 @@ pub struct Theme {
     pub title: Option<String>,
     pub main: Option<[u8; 3]>,
     pub accent: Option<[u8; 3]>,
+    pub inactive: Option<[u8; 3]>,
+    pub upcoming: Option<[u8; 3]>,
 }
 
 impl Song {
@@ -71,7 +74,10 @@ impl App {
         match self.anchor_instant {
             None => self.anchor_position,
             Some(instant) => {
-                self.anchor_position + Instant::now().saturating_duration_since(instant).as_millis()
+                self.anchor_position
+                    + Instant::now()
+                        .saturating_duration_since(instant)
+                        .as_millis()
             }
         }
     }
@@ -83,14 +89,34 @@ impl Theme {
             Theme {
                 title: None,
                 main: None,
-                accent: None
+                accent: None,
+                inactive: None,
+                upcoming: None,
             }
-        }else {
+        } else {
             Theme {
                 title: None,
                 main: Some(config.color.fallback_main_rgb()),
                 accent: Some(config.color.fallback_accent_rgb()),
+                inactive: None,
+                upcoming: None,
             }
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.title = None;
+        self.main = None;
+        self.accent = None;
+        self.inactive = None;
+        self.upcoming = None;
+    }
+
+    pub fn mix_colors(&self) -> [Color; 2] {
+        let inactive = self.inactive.map(Color::from).unwrap_or(Color::DarkGray);
+
+        let upcoming = self.upcoming.map(Color::from).unwrap_or(Color::Gray);
+
+        [inactive, upcoming]
     }
 }

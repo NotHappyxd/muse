@@ -1,6 +1,6 @@
-use std::array;
-use std::sync::{LazyLock};
 use crate::colorgen::colors::Lab;
+use std::array;
+use std::sync::LazyLock;
 
 static LINEAR_CACHE: LazyLock<[f32; 256]> = LazyLock::new(|| {
     array::from_fn(|i| {
@@ -52,16 +52,19 @@ pub fn oklab_to_linear_srgb(lab: &Lab) -> [f32; 3] {
     let m = m_ * m_ * m_;
     let s = s_ * s_ * s_;
 
-    [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+    [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
     ]
 }
 
 fn linear_to_srgb(linear: [f32; 3]) -> [u8; 3] {
-    [linear_channel_to_srgb_channel(linear[0]),
-    linear_channel_to_srgb_channel(linear[1]),
-    linear_channel_to_srgb_channel(linear[2])]
+    [
+        linear_channel_to_srgb_channel(linear[0]),
+        linear_channel_to_srgb_channel(linear[1]),
+        linear_channel_to_srgb_channel(linear[2]),
+    ]
 }
 
 pub fn oklab_to_rgb(lab: &Lab) -> [u8; 3] {
@@ -80,17 +83,13 @@ fn linear_channel_to_srgb_channel(c: f32) -> u8 {
     (v.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
-
 pub fn to_hsl(color: &Lab) -> [f32; 3] {
-    let rgb_normal = oklab_to_rgb(&color)
-        .map(|color| color as f32 / 255.0);
+    let rgb_normal = oklab_to_rgb(&color).map(|color| color as f32 / 255.0);
 
     let mut iter = rgb_normal.iter();
     let first = *iter.next().unwrap();
 
-    let (min, max) = iter.fold((first, first), |(min, max), &x| {
-        (min.min(x), max.max(x))
-    });
+    let (min, max) = iter.fold((first, first), |(min, max), &x| (min.min(x), max.max(x)));
 
     let delta = max - min;
 
@@ -104,9 +103,9 @@ pub fn to_hsl(color: &Lab) -> [f32; 3] {
 
     let mut hue = if rgb_normal[0] == max {
         (rgb_normal[1] - rgb_normal[2]) / (max - min)
-    }else if rgb_normal[1] == max {
+    } else if rgb_normal[1] == max {
         2.0 + ((rgb_normal[2] - rgb_normal[0]) / (max - min))
-    }else {
+    } else {
         4.0 + ((rgb_normal[0] - rgb_normal[1]) / (max - min))
     };
 

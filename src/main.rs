@@ -1,21 +1,21 @@
-mod ui;
-mod watcher;
-mod lyric;
 mod cache;
-mod theme;
 mod colorgen;
 mod config;
+mod lyric;
+mod theme;
+mod ui;
+mod watcher;
 
-use std::cell::Cell;
-use ratatui::DefaultTerminal;
-use color_eyre::Result;
-use mpris::{PlayerFinder};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio::sync::watch;
-use watcher::{run_watcher, AppEvent};
 use crate::config::Config;
 use crate::ui::state::{App, Song};
 use crate::watcher::PlayerCommand;
+use color_eyre::Result;
+use mpris::PlayerFinder;
+use ratatui::DefaultTerminal;
+use std::cell::Cell;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio::sync::watch;
+use watcher::{run_watcher, AppEvent};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -32,24 +32,21 @@ async fn main() -> Result<()> {
     });
 
     let result = tokio::task::spawn_blocking(move || {
-        let _ = ratatui::run(|terminal| {
-            run_ui(terminal, &mut rx, tx, config)
-        });
-    }).await?;
+        let _ = ratatui::run(|terminal| run_ui(terminal, &mut rx, tx, config));
+    })
+    .await?;
 
     let _ = shutdown_tx.send(true);
 
     Ok(result)
 }
 
-
 fn run_ui(
     terminal: &mut DefaultTerminal,
     rx: &mut tokio::sync::mpsc::UnboundedReceiver<AppEvent>,
     tx: UnboundedSender<AppEvent>,
-    config: Config
+    config: Config,
 ) -> Result<()> {
-
     let mut app = App::new(config);
 
     app.tx = Some(tx.clone());
@@ -59,18 +56,13 @@ fn run_ui(
             handle_event(event, &mut app)
         }
 
-        terminal.draw(|frame| {
-            match app.handle_events() {
-                Ok(false) => {
-                    frame.render_widget(
-                        &app,
-                        frame.area()
-                    );
-                }
-                Ok(true) => {}
-                Err(e) => {
-                    eprintln!("Error {}", e);
-                }
+        terminal.draw(|frame| match app.handle_events() {
+            Ok(false) => {
+                frame.render_widget(&app, frame.area());
+            }
+            Ok(true) => {}
+            Err(e) => {
+                eprintln!("Error {}", e);
             }
         })?;
 
@@ -98,9 +90,7 @@ fn handle_event(event: AppEvent, app: &mut App) {
                 let song = app.active_song.as_ref().unwrap();
 
                 if app.theme.title.as_ref() != Some(&song.title) {
-                    app.theme.title = None;
-                    app.theme.main = None;
-                    app.theme.accent = None;
+                    app.theme.reset();
                 }
             }
 
@@ -108,9 +98,11 @@ fn handle_event(event: AppEvent, app: &mut App) {
             app.manual_scroll_offset = Cell::new(0);
         }
 
-        AppEvent::PlaybackAnchor { position_ms, is_playing, at } => {
-            app.set_progress(position_ms, is_playing, at)
-        }
+        AppEvent::PlaybackAnchor {
+            position_ms,
+            is_playing,
+            at,
+        } => app.set_progress(position_ms, is_playing, at),
 
         AppEvent::PlayerDetached => {}
 
@@ -122,14 +114,17 @@ fn handle_event(event: AppEvent, app: &mut App) {
             app.lyrics = lyrics;
         }
 
-        AppEvent::Idle => {},
-        AppEvent::PlayerCommand(command) => {
-            handle_player_command(command)
-        },
-        AppEvent::ThemeFetched { song_title, rgb, accent } => {
+        AppEvent::Idle => {}
+        AppEvent::PlayerCommand(command) => handle_player_command(command),
+        AppEvent::ThemeFetched { song_title, theme } => {
             app.theme.title = Some(song_title);
-            app.theme.main = Some(rgb);
-            app.theme.accent = Some(accent);
+            app.theme.main = Some(theme.main);
+            app.theme.accent = Some(theme.accent);
+
+            if app.config.color.theme_inactive_lines {
+                app.theme.inactive = theme.inactive;
+                app.theme.upcoming = theme.upcoming;
+            }
         }
     }
 }
@@ -147,8 +142,12 @@ fn handle_player_command(cmd: PlayerCommand) {
 
     if let Some(player) = player {
         match cmd {
-            PlayerCommand::Pause => { let _ = player.play_pause(); }
-            PlayerCommand::Next => { let _ = player.next(); }
+            PlayerCommand::Pause => {
+                let _ = player.play_pause();
+            }
+            PlayerCommand::Next => {
+                let _ = player.next();
+            }
             PlayerCommand::Previous => {
                 let _ = player.previous();
             }

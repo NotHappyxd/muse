@@ -1,12 +1,16 @@
 use crate::colorgen::colors::{find_max_chroma_oklab, wcag_contrast, Lab, Oklch};
+use crate::colorgen::conversions::{oklab_to_rgb, rgb_to_oklab};
 use crate::colorgen::kmeans::{color_histogram, kmeans};
+use crate::colorgen::scoring::main_score;
 use crate::colorgen::{colors, conversions, scoring};
 use image::DynamicImage;
-use crate::colorgen::scoring::main_score;
 
+#[derive(Debug)]
 pub struct Theme {
     pub main: [u8; 3],
     pub accent: [u8; 3],
+    pub inactive: Option<[u8; 3]>,
+    pub upcoming: Option<[u8; 3]>,
 }
 
 pub fn generate_from_image(
@@ -22,11 +26,15 @@ pub fn generate_from_image(
 
     let total_pixels = clusters.iter().map(|cluster| cluster.size).sum();
 
-    let main = clusters.iter()
+    let main = clusters
+        .iter()
         .filter(|c| c.color.chroma() >= min_chroma)
         .max_by(|a, b| {
-        main_score(a, total_pixels).partial_cmp(&main_score(b, total_pixels)).unwrap()
-    }).unwrap_or(clusters.first().unwrap());
+            main_score(a, total_pixels)
+                .partial_cmp(&main_score(b, total_pixels))
+                .unwrap()
+        })
+        .unwrap_or(clusters.first().unwrap());
 
     let accent = clusters
         .iter()
@@ -45,9 +53,16 @@ pub fn generate_from_image(
     };
 
     let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
+    let accent_color = nudge_accent(&accent_lab, main_color, 4.0, true);
+
+    let main_lab = rgb_to_oklab(main_color);
+    let accent_lab = rgb_to_oklab(accent_color);
+
     Theme {
         main: main_color,
-        accent: nudge_accent(&accent_lab, main_color, 4.0, true),
+        accent: accent_color,
+        inactive: Some(generate_mix(&main_lab, &accent_lab, 0.75, 0.55)),
+        upcoming: Some(generate_mix(&accent_lab, &main_lab, 0.45, 0.25)),
     }
 }
 
@@ -124,4 +139,19 @@ pub fn nudge_accent(
     };
 
     nudge_for_contrast(color, background_rgb, target_ratio, floor, ceiling)
+}
+
+pub fn generate_mix(main: &Lab, accent: &Lab, t: f32, chroma_scale: f32) -> [u8; 3] {
+    let mut mix = mix_colors(accent, main, t);
+    mix.scale_chroma(chroma_scale);
+
+    oklab_to_rgb(&mix)
+}
+
+fn mix_colors(a: &Lab, b: &Lab, t: f32) -> Lab {
+    Lab {
+        l: a.l + (b.l - a.l) * t,
+        a: a.a + (b.a - a.a) * t,
+        b: a.b + (b.b - a.b) * t,
+    }
 }
