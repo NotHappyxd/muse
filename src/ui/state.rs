@@ -112,11 +112,11 @@ impl Theme {
         self.upcoming = None;
     }
 
-    pub fn mix_colors(&self) -> [Color; 2] {
+    pub fn mix_colors(&self) -> (Color, Color) {
         let inactive = self.inactive.map(Color::from).unwrap_or(Color::DarkGray);
 
         let upcoming = self.upcoming.map(Color::from).unwrap_or(Color::Gray);
 
-        [inactive, upcoming]
+        (inactive, upcoming)
     }
 }

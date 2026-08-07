@@ -1,10 +1,13 @@
+use std::cmp::Ordering;
 use crate::ui::state::App;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Fill, Length};
 use ratatui::layout::{Alignment, Layout, Rect};
 use ratatui::prelude::Text;
 use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::text::Line;
 use ratatui::widgets::{LineGauge, Paragraph, Widget};
+use crate::lyric::LyricLine;
 
 impl App {
     pub(crate) fn render_gauge(&self, area: Rect, buf: &mut Buffer) {
@@ -17,10 +20,8 @@ impl App {
 
         Text::from(label).centered().render(label_area, buf);
 
-        let song_length = match self.active_song.as_ref() {
-            Some(song) => song.length,
-            None => 0,
-        };
+        let song_length = self.active_song.as_ref()
+            .map_or(0, |song| song.length);
 
         let ratio = if song_length == 0 {
             0.0
@@ -73,7 +74,7 @@ impl App {
         };
 
         if &lyrics.song != &active_song.title {
-            Paragraph::new("Fetching lyrics...")
+            Text::from("Fetching lyrics...")
                 .alignment(alignment)
                 .style(Style::default().fg(accent))
                 .render(area, buf);
@@ -83,29 +84,28 @@ impl App {
         let synced_lyrics = &lyrics.lyrics;
 
         if synced_lyrics.is_empty() {
-            Paragraph::new("No synchronized lyrics found.")
+            Text::from("No synchronized lyrics found.")
                 .alignment(alignment)
                 .style(Style::default().fg(accent))
                 .render(area, buf);
             return;
         }
 
-        self.display_lyrics(area, buf, accent, alignment)
+        self.display_lyrics(area, buf, synced_lyrics, accent, alignment)
     }
 
-    fn display_lyrics(&self, area: Rect, buf: &mut Buffer, accent: Color, alignment: Alignment) {
+    fn display_lyrics(&self, area: Rect, buf: &mut Buffer, synced_lyrics: &[LyricLine], accent: Color, alignment: Alignment) {
         let current_ms = self.current_progress();
-
-        let synced_lyrics = &self.lyrics.as_ref().unwrap().lyrics;
 
         let active_idx = synced_lyrics
             .iter()
             .rposition(|line| line.timestamp <= current_ms as u64)
             .unwrap_or(0);
 
-        let mut lines = Vec::new();
+        let mut lines = Vec::with_capacity(synced_lyrics.len());
 
-        let mix = self.theme.mix_colors();
+        let (inactive, upcoming) = self.theme.mix_colors();
+
         let modifier = if self.config.color.dim_inactive_lines {
             Modifier::DIM
         } else {
@@ -115,30 +115,30 @@ impl App {
         for (i, lyric) in synced_lyrics.iter().enumerate() {
             let mut text = lyric.line.clone();
 
-            let style = if i < active_idx {
-                Style::default().fg(mix[0]).add_modifier(modifier)
-            } else if i == active_idx {
-                text.insert_str(0, &self.config.lyric_settings.active_prefix);
-
-                Style::default().fg(accent).bold()
-            } else {
-                Style::default().fg(mix[1]).add_modifier(modifier)
+            let style = match i.cmp(&active_idx) {
+                Ordering::Less => Style::default().fg(inactive).add_modifier(modifier),
+                Ordering::Equal => Style::default().fg(accent).bold(),
+                Ordering::Greater => Style::default().fg(upcoming).add_modifier(modifier)
             };
 
-            lines.push(ratatui::text::Line::from(text).style(style));
+            if i == active_idx {
+                text.insert_str(0, &self.config.lyric_settings.active_prefix);
+            }
+
+            lines.push(Line::from(text).style(style));
         }
 
         let visible_height = area.height;
         let half_height = visible_height.saturating_sub(1) / 2;
 
         let base_scroll_y = active_idx.saturating_sub(half_height as usize) as i16;
-        let max_scroll = lines.len().saturating_sub(visible_height as usize).max(0) as i16;
+        let max_scroll = lines.len().saturating_sub(visible_height as usize) as i16;
 
         let mut offset = self.manual_scroll_offset.get();
-        let mut final_scroll = base_scroll_y + self.manual_scroll_offset.get();
+        let mut final_scroll = base_scroll_y + offset;
 
         if final_scroll < 0 {
-            offset += 0 - final_scroll;
+            offset -= final_scroll;
             final_scroll = 0;
         }
 
