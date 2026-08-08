@@ -298,6 +298,7 @@ fn fetch_theme_task(
     let k_clusters = color.k_clusters;
     let max_iterations = color.max_color_gen_iterations;
     let min_chroma = color.min_chroma;
+    let min_chroma_percentage = color.min_chroma_percentage;
 
     tokio::spawn(async move {
         fetch_theme(
@@ -307,6 +308,7 @@ fn fetch_theme_task(
             k_clusters,
             max_iterations,
             min_chroma,
+            min_chroma_percentage
         )
         .await
     });

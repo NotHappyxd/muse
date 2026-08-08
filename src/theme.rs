@@ -9,6 +9,7 @@ pub async fn fetch_theme(
     k_clusters: u8,
     max_iterations: u8,
     min_chroma: f32,
+    min_chroma_percentage: f32,
 ) {
     let bytes = match fetch_art_bytes(&art_url).await {
         Ok(bytes) => bytes,
@@ -36,6 +37,7 @@ pub async fn fetch_theme(
         max_iterations as usize,
         min_chroma,
         false,
+        min_chroma_percentage
     );
 
     let _ = tx.send(AppEvent::ThemeFetched { song_title, theme });

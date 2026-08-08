@@ -59,7 +59,7 @@ impl App {
             .map(Color::from)
             .unwrap_or(Color::from(self.config.color.fallback_accent_rgb()));
 
-        let alignment = if self.config.lyric_settings.center {
+        let alignment = if self.config.lyric.center {
             Alignment::Center
         } else {
             Alignment::Left
@@ -122,7 +122,7 @@ impl App {
             };
 
             if i == active_idx {
-                text.insert_str(0, &self.config.lyric_settings.active_prefix);
+                text.insert_str(0, &self.config.lyric.active_prefix);
             }
 
             lines.push(Line::from(text).style(style));

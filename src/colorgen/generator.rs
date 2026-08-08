@@ -4,6 +4,7 @@ use crate::colorgen::kmeans::{color_histogram, kmeans};
 use crate::colorgen::scoring::main_score;
 use crate::colorgen::{colors, conversions, scoring};
 use image::DynamicImage;
+use crate::colorgen::adjustments::{generate_mix, nudge_accent, nudge_chroma_floor};
 
 #[derive(Debug)]
 pub struct Theme {
@@ -19,6 +20,7 @@ pub fn generate_from_image(
     max_iterations: usize,
     min_chroma: f32,
     account_light: bool,
+    min_chroma_percentage: f32
 ) -> Theme {
     let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
 
@@ -46,11 +48,13 @@ pub fn generate_from_image(
                 .unwrap()
         });
 
-    let accent_lab = if let Some(cluster) = accent {
+    let mut accent_lab = if let Some(cluster) = accent {
         cluster.color
     } else {
         synthesize_harmonic_accent(&main.color)
     };
+
+    accent_lab = nudge_chroma_floor(&mut accent_lab, min_chroma_percentage);
 
     let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     let accent_color = nudge_accent(&accent_lab, main_color, 4.0, true);
@@ -60,7 +64,7 @@ pub fn generate_from_image(
 
     Theme {
         main: main_color,
-        accent: accent_color,
+        accent: oklab_to_rgb(&accent_lab),
         inactive: Some(generate_mix(&main_lab, &accent_lab, 0.75, 0.55)),
         upcoming: Some(generate_mix(&accent_lab, &main_lab, 0.45, 0.25)),
     }
@@ -88,7 +92,7 @@ pub fn nudge_for_contrast(
         let mid = (low + high) / 2.0;
         let mut test = lch;
         test.l = mid;
-        let rgb = conversions::oklab_to_rgb(&find_max_chroma_oklab(test));
+        let rgb = oklab_to_rgb(&find_max_chroma_oklab(test));
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
             best_rgb = rgb;
@@ -123,35 +127,5 @@ fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {
     hsl[1] = (hsl[1] * 1.2).clamp(0.3, 0.85); // Boost saturation for visibility
 
     let rgb = conversions::hsl_to_rgb(hsl);
-    conversions::rgb_to_oklab(rgb)
-}
-
-pub fn nudge_accent(
-    color: &Lab,
-    background_rgb: [u8; 3],
-    target_ratio: f32,
-    background_is_dark: bool,
-) -> [u8; 3] {
-    let (floor, ceiling) = if background_is_dark {
-        (0.58, 0.85)
-    } else {
-        (0.15, 0.42)
-    };
-
-    nudge_for_contrast(color, background_rgb, target_ratio, floor, ceiling)
-}
-
-pub fn generate_mix(main: &Lab, accent: &Lab, t: f32, chroma_scale: f32) -> [u8; 3] {
-    let mut mix = mix_colors(accent, main, t);
-    mix.scale_chroma(chroma_scale);
-
-    oklab_to_rgb(&mix)
-}
-
-fn mix_colors(a: &Lab, b: &Lab, t: f32) -> Lab {
-    Lab {
-        l: a.l + (b.l - a.l) * t,
-        a: a.a + (b.a - a.a) * t,
-        b: a.b + (b.b - a.b) * t,
-    }
+    rgb_to_oklab(rgb)
 }

@@ -8,7 +8,7 @@ pub struct Config {
     pub player: String,
     pub header: Header,
     pub color: Color,
-    pub lyric_settings: LyricSettings,
+    pub lyric: LyricSettings,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -29,6 +29,7 @@ pub struct Color {
     pub fallback_accent: String,
     pub theme_inactive_lines: bool,
     pub dim_inactive_lines: bool,
+    pub min_chroma_percentage: f32
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -67,6 +68,7 @@ impl Default for Color {
             fallback_accent: "#ffffff".to_owned(),
             theme_inactive_lines: true,
             dim_inactive_lines: true,
+            min_chroma_percentage: 0.4
         }
     }
 }
@@ -77,7 +79,7 @@ impl Default for Config {
             player: String::from(""),
             header: Header::default(),
             color: Color::default(),
-            lyric_settings: LyricSettings::default(),
+            lyric: LyricSettings::default(),
         }
     }
 }

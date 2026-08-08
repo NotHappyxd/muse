@@ -3,3 +3,4 @@ pub mod conversions;
 pub mod generator;
 pub mod kmeans;
 pub mod scoring;
+pub mod adjustments;

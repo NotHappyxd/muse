@@ -41,6 +41,17 @@ impl Lab {
         self.a *= chroma;
         self.b *= chroma;
     }
+
+    pub fn with_chroma(&mut self, chroma: f32) {
+        let current = self.chroma();
+
+        if current <= f32::EPSILON {
+            return;
+        }
+
+        let scale = chroma / current;
+        self.scale_chroma(scale);
+    }
 }
 
 impl Oklch {
@@ -61,7 +72,7 @@ impl Oklch {
 
 pub fn find_max_chroma_oklab(mut lch: Oklch) -> Lab {
     let mut low_c = 0.0f32;
-    let mut high_c = (lch.c * 5.0).min(0.4);
+    let mut high_c = lch.c;
     let mut best_lab = lch.to_oklab();
 
     for _ in 0..8 {
@@ -104,4 +115,9 @@ pub fn wcag_contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
     let lb = luminance(b);
     let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
     (hi + 0.05) / (lo + 0.05)
+}
+
+pub fn true_gamut_max_chroma(l: f32, h: f32) -> f32 {
+    let lab = find_max_chroma_oklab(Oklch { l, c: 0.4, h });
+    Oklch::from_oklab(&lab).c
 }
