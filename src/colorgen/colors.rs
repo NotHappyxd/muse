@@ -1,3 +1,4 @@
+use std::cmp::max;
 use crate::colorgen::conversions;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -60,7 +61,7 @@ impl Oklch {
 
 pub fn find_max_chroma_oklab(mut lch: Oklch) -> Lab {
     let mut low_c = 0.0f32;
-    let mut high_c = lch.c;
+    let mut high_c = (lch.c * 5.0).min(0.4);
     let mut best_lab = lch.to_oklab();
 
     for _ in 0..8 {

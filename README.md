@@ -20,7 +20,7 @@ Download the tar.gz, then run
 ```bash
 tar -xzf muse-v{version}-{architecture}.tar.gz
 cd muse-v{version}-{architecture}
-cp muse ~/.local/bin/muse
+mv muse ~/.local/bin/muse
 ```
 
 If muse doesn't work from the console, you may need to add ~/.local/bin/ to your PATH. Enter your shell file (.bashrc or .zshrc) and add the line 

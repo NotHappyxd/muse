@@ -77,7 +77,7 @@ pub fn nudge_for_contrast(
     let mut lch = Oklch::from_oklab(color);
     lch.l = lch.l.clamp(hard_min, hard_max);
 
-    let starting_rgb = conversions::oklab_to_rgb(&find_max_chroma_oklab(lch));
+    let starting_rgb = oklab_to_rgb(&find_max_chroma_oklab(lch));
     let is_lighter = colors::luminance(starting_rgb) >= colors::luminance(background_rgb);
 
     let mut low = if is_lighter { lch.l } else { hard_min };
