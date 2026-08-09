@@ -57,16 +57,13 @@ pub fn generate_from_image(
     accent_lab = nudge_chroma_floor(&mut accent_lab, min_chroma_percentage);
 
     let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
-    let accent_color = nudge_accent(&accent_lab, main_color, 4.0, true);
-
-    let main_lab = rgb_to_oklab(main_color);
-    let accent_lab = rgb_to_oklab(accent_color);
-
+    let accent_color = nudge_accent(&accent_lab, oklab_to_rgb(&main_color), 4.0, true);
+    
     Theme {
-        main: main_color,
+        main: oklab_to_rgb(&main_color),
         accent: oklab_to_rgb(&accent_lab),
-        inactive: Some(generate_mix(&main_lab, &accent_lab, 0.75, 0.55)),
-        upcoming: Some(generate_mix(&accent_lab, &main_lab, 0.45, 0.25)),
+        inactive: Some(generate_mix(&main_color, &accent_color, 0.75, 0.55)),
+        upcoming: Some(generate_mix(&accent_color, &main_color, 0.45, 0.25)),
     }
 }
 
@@ -77,25 +74,26 @@ pub fn nudge_for_contrast(
     target_ratio: f32,
     hard_min: f32,
     hard_max: f32,
-) -> [u8; 3] {
+) -> Lab {
     let mut lch = Oklch::from_oklab(color);
     lch.l = lch.l.clamp(hard_min, hard_max);
 
-    let starting_rgb = oklab_to_rgb(&find_max_chroma_oklab(lch));
+    let mut best_color = find_max_chroma_oklab(lch);
+    let starting_rgb = oklab_to_rgb(&best_color);
     let is_lighter = colors::luminance(starting_rgb) >= colors::luminance(background_rgb);
 
     let mut low = if is_lighter { lch.l } else { hard_min };
     let mut high = if is_lighter { hard_max } else { lch.l };
-    let mut best_rgb = starting_rgb;
 
     for _ in 0..12 {
         let mid = (low + high) / 2.0;
         let mut test = lch;
         test.l = mid;
-        let rgb = oklab_to_rgb(&find_max_chroma_oklab(test));
+        let candidate = find_max_chroma_oklab(test);
+        let rgb = oklab_to_rgb(&candidate);
 
         if wcag_contrast(rgb, background_rgb) >= target_ratio {
-            best_rgb = rgb;
+            best_color = candidate;
             if is_lighter {
                 high = mid;
             } else {
@@ -110,7 +108,7 @@ pub fn nudge_for_contrast(
         }
     }
 
-    best_rgb
+    best_color
 }
 
 fn synthesize_harmonic_accent(base_color: &Lab) -> Lab {

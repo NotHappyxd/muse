@@ -7,7 +7,7 @@ pub fn nudge_accent(
     background_rgb: [u8; 3],
     target_ratio: f32,
     background_is_dark: bool,
-) -> [u8; 3] {
+) -> Lab {
     let (floor, ceiling) = if background_is_dark {
         (0.58, 0.85)
     } else {

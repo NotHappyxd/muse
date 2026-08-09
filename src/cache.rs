@@ -3,13 +3,13 @@ use std::fs;
 
 const CACHE_DIRECTORY: &'static str = "~/.cache/muse";
 
-pub fn cache_key(title: &str, artists: &Vec<String>, _album: &str) -> String {
+pub fn cache_key(title: &str, artists: &[String], _album: &str) -> String {
     let key = format!("{}-{}", title, artists.join("-"));
 
     normalize(&key)
 }
 
-pub fn find_cache(title: &str, artists: &Vec<String>) -> Option<String> {
+pub fn find_cache(title: &str, artists: &[String]) -> Option<String> {
     let parent = expanduser(CACHE_DIRECTORY);
 
     if parent.is_err() {
