@@ -5,7 +5,7 @@ use ratatui::layout::Constraint::{Length, Min};
 use ratatui::layout::{Layout, Margin, Rect};
 use ratatui::widgets::Widget;
 
-impl Widget for &App {
+impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::vertical([Length(1), Min(0)]);
 
@@ -20,7 +20,9 @@ impl Widget for &App {
 
         header(header_area, buf, self);
         self.render_gauge(gauge_area, buf);
-
+        
+        self.lyric_area = Some(lyrics_area);
+        
         self.render_lyrics(lyrics_area, buf);
     }
 }

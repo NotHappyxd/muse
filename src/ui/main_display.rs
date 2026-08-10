@@ -129,13 +129,36 @@ impl App {
         }
 
         let visible_height = area.height;
+
+        let final_scroll = self.lyric_final_scroll_pos(visible_height, lines.len());
+
+        Paragraph::new(lines)
+            .alignment(alignment)
+            .scroll((final_scroll as u16, 0))
+            .render(area, buf);
+    }
+
+    fn lyric_scroll_position(&self, visible_height: u16) -> i16 {
+        let Some(lyrics) = &self.lyrics else {
+            return 0;
+        };
+
+        let current_ms = self.current_progress();
+
+        let active_idx = lyrics.lyrics
+            .iter()
+            .rposition(|line| line.timestamp <= current_ms as u64)
+            .unwrap_or(0);
+
         let half_height = visible_height.saturating_sub(1) / 2;
 
-        let base_scroll_y = active_idx.saturating_sub(half_height as usize) as i16;
-        let max_scroll = lines.len().saturating_sub(visible_height as usize) as i16;
+        active_idx.saturating_sub(half_height as usize) as i16
+    }
 
+    fn lyric_final_scroll_pos(&self, visible_height: u16, line_count: usize) -> i16 {
+        let max_scroll = line_count.saturating_sub(visible_height as usize) as i16;
         let mut offset = self.manual_scroll_offset.get();
-        let mut final_scroll = base_scroll_y + offset;
+        let mut final_scroll = self.lyric_scroll_position(visible_height) + offset;
 
         if final_scroll < 0 {
             offset -= final_scroll;
@@ -149,10 +172,27 @@ impl App {
 
         self.manual_scroll_offset.set(offset);
 
-        Paragraph::new(lines)
-            .alignment(alignment)
-            .scroll((final_scroll as u16, 0))
-            .render(area, buf);
+        final_scroll
+    }
+
+    pub fn lyric_at(&self, x: u16, y: u16) -> Option<usize> {
+        let area = self.lyric_area?;
+
+        if !area.contains((x, y).into()) {
+            return None;
+        }
+
+        let lyrics = self.lyrics.as_ref()?;
+
+        if lyrics.lyrics.is_empty() {
+            return None;
+        }
+
+        let final_scroll = self.lyric_final_scroll_pos(area.height, lyrics.lyrics.len());
+        let relative_y = y.saturating_sub(area.y);
+        let lyric_index = final_scroll as usize + relative_y as usize;
+
+        (lyric_index < lyrics.lyrics.len()).then_some(lyric_index)
     }
 }
 

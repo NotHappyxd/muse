@@ -13,6 +13,11 @@ use color_eyre::Result;
 use mpris::PlayerFinder;
 use ratatui::DefaultTerminal;
 use std::cell::Cell;
+use std::io::stdout;
+use std::time::Duration;
+use crossterm::event::EnableMouseCapture;
+use crossterm::execute;
+use crossterm::terminal::EnterAlternateScreen;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::watch;
 use watcher::{run_watcher, AppEvent};
@@ -32,6 +37,12 @@ async fn main() -> Result<()> {
     });
 
     let result = tokio::task::spawn_blocking(move || {
+        let _ = execute!(
+            stdout(),
+            EnterAlternateScreen,
+            EnableMouseCapture
+        );
+
         let _ = ratatui::run(|terminal| run_ui(terminal, &mut rx, tx, config));
     })
     .await?;
@@ -58,7 +69,7 @@ fn run_ui(
 
         terminal.draw(|frame| match app.handle_events() {
             Ok(false) => {
-                frame.render_widget(&app, frame.area());
+                frame.render_widget(&mut app, frame.area());
             }
             Ok(true) => {}
             Err(e) => {
@@ -150,6 +161,11 @@ fn handle_player_command(cmd: PlayerCommand) {
             }
             PlayerCommand::Previous => {
                 let _ = player.previous();
+            }
+            PlayerCommand::Skip(timestamp) => {
+                if let Some(track_id) = player.get_metadata().ok().and_then(|m| m.track_id()) {
+                    let _ = player.set_position(track_id, &Duration::from_millis(timestamp));
+                }
             }
         }
     }

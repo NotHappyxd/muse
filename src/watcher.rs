@@ -41,6 +41,7 @@ pub enum PlayerCommand {
     Pause,
     Next,
     Previous,
+    Skip(u64)
 }
 const POLL_MS: u64 = 500;
 const RETRY_COUNT: u8 = 3;
