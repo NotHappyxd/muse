@@ -13,6 +13,9 @@ on:
 permissions:
   contents: write
 
+env:
+  CROSS_VERSION: "0.2.5"
+
 jobs:
   build:
     name: Build (${{ matrix.target }})
@@ -32,6 +35,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -40,9 +44,13 @@ jobs:
 
       - name: Cache cargo registry
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross@${{ env.CROSS_VERSION }}
 
       - name: Build
         env:
@@ -55,36 +63,43 @@ jobs:
 
       - name: Package
         run: |
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${{ inputs.tag || github.ref_name }}"
           ARCHIVE="muse-${VERSION}-${{ matrix.name }}"
           
           rm -rf dist
-          mkdir -p dist/$ARCHIVE
+          mkdir -p dist/${ARCHIVE}
           
           test -f target/${{ matrix.target }}/release/muse
-          cp target/${{ matrix.target }}/release/muse dist/$ARCHIVE/
-          cp README.md dist/$ARCHIVE/
+          cp target/${{ matrix.target }}/release/muse dist/${ARCHIVE}/
+          cp README.md dist/${ARCHIVE}/
           
           tar -czf "${ARCHIVE}.tar.gz" -C dist "$ARCHIVE"
 
       - name: Generate Checksums
-        run: |
-          sha256sum "muse-${GITHUB_REF_NAME}-${{ matrix.name }}.tar.gz" \
-                      > "muse-${GITHUB_REF_NAME}-${{ matrix.name }}.tar.gz.sha256"
+        run: | 
+          VERSION="${{ inputs.tag || github.ref_name }}" 
+          ARCHIVE="muse-${VERSION}-${{ matrix.name }}.tar.gz" 
+          sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
 
       - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: muse-${{ matrix.name }}
           path: |
-            muse-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
-            muse-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
+            muse-${{ inputs.tag || github.ref_name }}-${{ matrix.name }}.tar.gz
+            muse-${{ inputs.tag || github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
   release:
     name: Create Github Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -97,23 +112,33 @@ jobs:
 
       - name: Generate commit list
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          TAG="${{ inputs.tag || github.ref_name }}"
+
+          PREV_TAG=$(
+            git describe \
+              --tags \
+              --abbrev=0 \
+              "${TAG}^" \
+              2>/dev/null || true
+          )
 
           {
             echo "## Commits"
             echo
 
             if [ -n "$PREV_TAG" ]; then
-              git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%h)"
+              git log "${PREV_TAG}..${TAG}" \
+                --pretty=format:"- %s (%h)"
             else
-              git log --pretty=format:"- %s (%h)"
+              git log "${TAG}" \
+                --pretty=format:"- %s (%h)"
             fi
           } > RELEASE_NOTES.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           body_path: RELEASE_NOTES.md
           generate_release_notes: true
           files: upload/*
