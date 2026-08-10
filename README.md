@@ -1,6 +1,7 @@
 # Muse
-
 This project was heavily inspired by snoowfall's [Lyse](https://github.com/snoowfall/lyse/) and Harman1307's [iris](https://github.com/Harman1307/iris).
+
+![Screenshot](screenshot.png)
 
 Muse is a terminal-based lyric viewer written in Rust that dynamically themes itself based on album art.
 

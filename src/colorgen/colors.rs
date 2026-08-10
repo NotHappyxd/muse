@@ -1,4 +1,3 @@
-use std::cmp::max;
 use crate::colorgen::conversions;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -25,6 +24,7 @@ impl Lab {
         dl * dl + da * da + db * db
     }
 
+    #[warn(dead_code)]
     pub fn accent_distance_squared(&self, other: &Self) -> f32 {
         let dl = self.l - other.l;
         let da = self.a - other.a;
