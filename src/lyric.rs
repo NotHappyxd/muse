@@ -25,11 +25,13 @@ pub async fn fetch_lyric(
             lyrics: convert_to_timed(&content),
         });
     }
+
+    let artists_str = artists.join(", ");
     let client = Client::new();
 
     let params = [
         ("track_name", title),
-        ("artist_name", &artists[0]),
+        ("artist_name", &artists_str),
         ("album", if album.is_empty() { title } else { album }),
         ("duration", &length.to_string()),
     ];
