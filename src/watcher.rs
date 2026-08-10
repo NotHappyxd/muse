@@ -43,7 +43,6 @@ pub enum PlayerCommand {
     Previous,
 }
 const POLL_MS: u64 = 500;
-const MAXIMUM_DRIFT_ALLOWED: i128 = 750;
 const RETRY_COUNT: u8 = 3;
 
 #[derive(Default)]
@@ -55,6 +54,7 @@ struct WatcherState {
     anchor_position: Option<u128>,
     anchor_instant: Option<Instant>,
     anchor_playing: bool,
+    last_real_position: Option<u128>,
 }
 
 struct SongInfo {
@@ -181,43 +181,31 @@ fn handle_active_player(
 }
 
 fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
-    let new_session = state.anchor_position.is_none() && !state.anchor_playing;
-
     let now = Instant::now();
-    let (poll_ms, have_real_reading) = match player.get_position() {
-        Ok(pos) => (pos.as_millis(), true),
-        Err(_) => (state.predicted_position(now), false),
-    };
-
-    let drifted = if have_real_reading && !new_session {
-        let predicted = state.predicted_position(now);
-        (poll_ms as i128 - predicted as i128).abs() > MAXIMUM_DRIFT_ALLOWED
-    } else {
-        false
-    };
-
-    let paused = match player.get_playback_status() {
-        Ok(PlaybackStatus::Paused) => true,
-        _ => false,
-    };
+    let paused = matches!(player.get_playback_status(), Ok(PlaybackStatus::Paused));
+    let Ok(pos) = player.get_position() else { return };
+    let real_ms = pos.as_millis();
 
     if paused {
-        let progress = player
-            .get_position()
-            .unwrap_or(Duration::from_millis(0))
-            .as_millis();
-        state.pause_anchor(progress);
+        state.pause_anchor(real_ms);
+        state.last_real_position = None;
 
         let _ = tx.send(AppEvent::PlaybackAnchor {
-            position_ms: progress,
+            position_ms: real_ms,
             is_playing: false,
             at: now,
         });
-    } else if new_session || drifted {
-        state.update_anchor(poll_ms, now, true);
+        return;
+    }
+
+    let is_new_reading = state.last_real_position != Some(real_ms);
+
+    if !state.anchor_playing || is_new_reading {
+        state.update_anchor(real_ms, now, true);
+        state.last_real_position = Some(real_ms);
 
         let _ = tx.send(AppEvent::PlaybackAnchor {
-            position_ms: poll_ms,
+            position_ms: real_ms,
             is_playing: true,
             at: now,
         });
