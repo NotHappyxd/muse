@@ -61,7 +61,7 @@ pub fn generate_from_image(
     
     Theme {
         main: oklab_to_rgb(&main_color),
-        accent: oklab_to_rgb(&accent_lab),
+        accent: oklab_to_rgb(&accent_color),
         inactive: Some(generate_mix(&main_color, &accent_color, 0.75, 0.55)),
         upcoming: Some(generate_mix(&accent_color, &main_color, 0.45, 0.25)),
     }
