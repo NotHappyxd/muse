@@ -20,9 +20,9 @@ impl Widget for &mut App {
 
         header(header_area, buf, self);
         self.render_gauge(gauge_area, buf);
-        
+
         self.lyric_area = Some(lyrics_area);
-        
+
         self.render_lyrics(lyrics_area, buf);
     }
 }

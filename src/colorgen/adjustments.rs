@@ -1,4 +1,4 @@
-use crate::colorgen::colors::{true_gamut_max_chroma, Lab, Oklch};
+use crate::colorgen::colors::{Lab, Oklch, true_gamut_max_chroma};
 use crate::colorgen::conversions::oklab_to_rgb;
 use crate::colorgen::generator::nudge_for_contrast;
 
@@ -32,11 +32,11 @@ fn mix_colors(a: &Lab, b: &Lab, t: f32) -> Lab {
     }
 }
 
-
 pub fn nudge_chroma_floor(color: &mut Lab, min_chroma_percentage: f32) -> Lab {
     let current = color.chroma();
 
-    if current < 0.02 { // Monochromatics are usually under 0.02, no need to alter appearance
+    if current < 0.02 {
+        // Monochromatics are usually under 0.02, no need to alter appearance
         return *color;
     }
 

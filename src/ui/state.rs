@@ -1,10 +1,10 @@
 use crate::config::Config;
 use crate::lyric::LyricResponse;
 use crate::watcher::AppEvent;
+use ratatui::layout::Rect;
 use ratatui::style::Color;
 use std::cell::Cell;
 use std::time::Instant;
-use ratatui::layout::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ pub struct App {
     pub manual_scroll_offset: Cell<i16>,
     pub tx: Option<UnboundedSender<AppEvent>>,
     pub config: Config,
-    pub lyric_area: Option<Rect>
+    pub lyric_area: Option<Rect>,
 }
 
 #[derive(Default, Debug)]
@@ -63,7 +63,7 @@ impl App {
             manual_scroll_offset: Cell::new(0),
             tx: None,
             config,
-            lyric_area: None
+            lyric_area: None,
         }
     }
 

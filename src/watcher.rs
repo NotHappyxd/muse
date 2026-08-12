@@ -1,7 +1,7 @@
 use crate::colorgen::generator::Theme;
 use crate::config;
 use crate::config::Config;
-use crate::lyric::{fetch_lyric, LyricResponse};
+use crate::lyric::{LyricResponse, fetch_lyric};
 use crate::theme::fetch_theme;
 use mpris::{Metadata, PlaybackStatus, Player, PlayerFinder};
 use std::time::{Duration, Instant};
@@ -41,7 +41,7 @@ pub enum PlayerCommand {
     Pause,
     Next,
     Previous,
-    Skip(u64)
+    Skip(u64),
 }
 const POLL_MS: u64 = 500;
 const RETRY_COUNT: u8 = 3;
@@ -184,7 +184,9 @@ fn handle_active_player(
 fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
     let now = Instant::now();
     let paused = matches!(player.get_playback_status(), Ok(PlaybackStatus::Paused));
-    let Ok(pos) = player.get_position() else { return };
+    let Ok(pos) = player.get_position() else {
+        return;
+    };
     let real_ms = pos.as_millis();
 
     if paused {
@@ -297,7 +299,7 @@ fn fetch_theme_task(
             k_clusters,
             max_iterations,
             min_chroma,
-            min_chroma_percentage
+            min_chroma_percentage,
         )
         .await
     });

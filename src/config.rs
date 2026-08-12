@@ -29,7 +29,7 @@ pub struct Color {
     pub fallback_accent: String,
     pub theme_inactive_lines: bool,
     pub dim_inactive_lines: bool,
-    pub min_chroma_percentage: f32
+    pub min_chroma_percentage: f32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -68,7 +68,7 @@ impl Default for Color {
             fallback_accent: "#ffffff".to_owned(),
             theme_inactive_lines: true,
             dim_inactive_lines: true,
-            min_chroma_percentage: 0.4
+            min_chroma_percentage: 0.4,
         }
     }
 }

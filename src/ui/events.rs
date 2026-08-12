@@ -1,13 +1,15 @@
 use crate::ui::state::App;
 use crate::watcher::{AppEvent, PlayerCommand};
 use crossterm::event;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use std::time::Duration;
 
 impl App {
     pub(crate) fn handle_events(&mut self) -> color_eyre::Result<bool> {
         let timeout = Duration::from_secs_f32(1.0 / 20.0);
-        
+
         if event::poll(timeout)? {
             match event::read()? {
                 Event::Key(key) => {
@@ -16,11 +18,9 @@ impl App {
                     if let Ok(true) = res {
                         return Ok(true);
                     }
-                },
-                Event::Mouse(mouse) => self.handle_mouse_press(mouse),
-                _ => {
-
                 }
+                Event::Mouse(mouse) => self.handle_mouse_press(mouse),
+                _ => {}
             }
         }
 
@@ -82,7 +82,7 @@ impl App {
         let Some(at_idx) = self.lyric_at(x, y) else {
             return;
         };
-        
+
         let Some(lyric) = self.lyrics.as_ref() else {
             return;
         };

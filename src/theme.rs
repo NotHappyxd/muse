@@ -37,7 +37,7 @@ pub async fn fetch_theme(
         max_iterations as usize,
         min_chroma,
         false,
-        min_chroma_percentage
+        min_chroma_percentage,
     );
 
     let _ = tx.send(AppEvent::ThemeFetched { song_title, theme });

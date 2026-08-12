@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use crate::lyric::LyricLine;
 use crate::ui::state::App;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Fill, Length};
@@ -7,7 +7,7 @@ use ratatui::prelude::Text;
 use ratatui::style::{Color, Modifier, Style, Stylize};
 use ratatui::text::Line;
 use ratatui::widgets::{LineGauge, Paragraph, Widget};
-use crate::lyric::LyricLine;
+use std::cmp::Ordering;
 
 impl App {
     pub(crate) fn render_gauge(&self, area: Rect, buf: &mut Buffer) {
@@ -20,8 +20,7 @@ impl App {
 
         Text::from(label).centered().render(label_area, buf);
 
-        let song_length = self.active_song.as_ref()
-            .map_or(0, |song| song.length);
+        let song_length = self.active_song.as_ref().map_or(0, |song| song.length);
 
         let ratio = if song_length == 0 {
             0.0
@@ -55,7 +54,9 @@ impl App {
             return;
         };
 
-        let accent = self.theme.accent
+        let accent = self
+            .theme
+            .accent
             .map(Color::from)
             .unwrap_or(Color::from(self.config.color.fallback_accent_rgb()));
 
@@ -94,7 +95,14 @@ impl App {
         self.display_lyrics(area, buf, synced_lyrics, accent, alignment)
     }
 
-    fn display_lyrics(&self, area: Rect, buf: &mut Buffer, synced_lyrics: &[LyricLine], accent: Color, alignment: Alignment) {
+    fn display_lyrics(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        synced_lyrics: &[LyricLine],
+        accent: Color,
+        alignment: Alignment,
+    ) {
         let current_ms = self.current_progress();
 
         let active_idx = synced_lyrics
@@ -115,17 +123,17 @@ impl App {
             let mut text = lyric.line.clone();
 
             let style = match active_idx {
-                Some(active_idx) => {
-                    match i.cmp(&active_idx) {
-                        Ordering::Less => Style::default().fg(inactive).add_modifier(modifier),
-                        Ordering::Equal => Style::default().fg(accent).bold(),
-                        Ordering::Greater => Style::default().fg(upcoming).add_modifier(modifier)
-                    }
+                Some(active_idx) => match i.cmp(&active_idx) {
+                    Ordering::Less => Style::default().fg(inactive).add_modifier(modifier),
+                    Ordering::Equal => Style::default().fg(accent).bold(),
+                    Ordering::Greater => Style::default().fg(upcoming).add_modifier(modifier),
                 },
-                None => Style::default().fg(upcoming).add_modifier(modifier)
+                None => Style::default().fg(upcoming).add_modifier(modifier),
             };
 
-            if let Some(active_idx) = active_idx && active_idx == i {
+            if let Some(active_idx) = active_idx
+                && active_idx == i
+            {
                 text.insert_str(0, &self.config.lyric.active_prefix);
             }
 
@@ -149,7 +157,8 @@ impl App {
 
         let current_ms = self.current_progress();
 
-        let active_idx = lyrics.lyrics
+        let active_idx = lyrics
+            .lyrics
             .iter()
             .rposition(|line| line.timestamp <= current_ms as u64)
             .unwrap_or(0);

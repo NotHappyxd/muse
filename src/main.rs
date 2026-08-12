@@ -10,17 +10,17 @@ use crate::config::Config;
 use crate::ui::state::{App, Song};
 use crate::watcher::PlayerCommand;
 use color_eyre::Result;
+use crossterm::event::EnableMouseCapture;
+use crossterm::execute;
+use crossterm::terminal::EnterAlternateScreen;
 use mpris::PlayerFinder;
 use ratatui::DefaultTerminal;
 use std::cell::Cell;
 use std::io::stdout;
-use std::time::{Duration, Instant};
-use crossterm::event::EnableMouseCapture;
-use crossterm::execute;
-use crossterm::terminal::EnterAlternateScreen;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use std::time::Duration;
+use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 use tokio::sync::watch;
-use watcher::{run_watcher, AppEvent};
+use watcher::{AppEvent, run_watcher};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,11 +37,7 @@ async fn main() -> Result<()> {
     });
 
     let result = tokio::task::spawn_blocking(move || {
-        let _ = execute!(
-            stdout(),
-            EnterAlternateScreen,
-            EnableMouseCapture
-        );
+        let _ = execute!(stdout(), EnterAlternateScreen, EnableMouseCapture);
 
         let _ = ratatui::run(|terminal| run_ui(terminal, &mut rx, tx, config));
     })
@@ -117,7 +113,7 @@ fn handle_event(event: AppEvent, app: &mut App) {
             if app.active_song.is_some() {
                 app.set_progress(position_ms, is_playing, at);
             }
-        },
+        }
 
         AppEvent::PlayerDetached => {
             app.reset();

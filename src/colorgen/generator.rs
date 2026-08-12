@@ -1,10 +1,10 @@
-use crate::colorgen::colors::{find_max_chroma_oklab, wcag_contrast, Lab, Oklch};
+use crate::colorgen::adjustments::{generate_mix, nudge_accent, nudge_chroma_floor};
+use crate::colorgen::colors::{Lab, Oklch, find_max_chroma_oklab, wcag_contrast};
 use crate::colorgen::conversions::{oklab_to_rgb, rgb_to_oklab};
 use crate::colorgen::kmeans::{color_histogram, kmeans};
 use crate::colorgen::scoring::main_score;
 use crate::colorgen::{colors, conversions, scoring};
 use image::DynamicImage;
-use crate::colorgen::adjustments::{generate_mix, nudge_accent, nudge_chroma_floor};
 
 #[derive(Debug)]
 pub struct Theme {
@@ -20,7 +20,7 @@ pub fn generate_from_image(
     max_iterations: usize,
     min_chroma: f32,
     account_light: bool,
-    min_chroma_percentage: f32
+    min_chroma_percentage: f32,
 ) -> Theme {
     let clusters = kmeans(&color_histogram(&image), k_clusters, max_iterations);
 
@@ -58,7 +58,7 @@ pub fn generate_from_image(
 
     let main_color = nudge_for_contrast(&main.color, [13, 13, 13], 3.0, 0.2, 0.82);
     let accent_color = nudge_accent(&accent_lab, oklab_to_rgb(&main_color), 4.0, true);
-    
+
     Theme {
         main: oklab_to_rgb(&main_color),
         accent: oklab_to_rgb(&accent_color),
