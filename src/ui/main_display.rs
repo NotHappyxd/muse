@@ -99,8 +99,7 @@ impl App {
 
         let active_idx = synced_lyrics
             .iter()
-            .rposition(|line| line.timestamp <= current_ms as u64)
-            .unwrap_or(0);
+            .rposition(|line| line.timestamp <= current_ms as u64);
 
         let mut lines = Vec::with_capacity(synced_lyrics.len());
 
@@ -115,13 +114,18 @@ impl App {
         for (i, lyric) in synced_lyrics.iter().enumerate() {
             let mut text = lyric.line.clone();
 
-            let style = match i.cmp(&active_idx) {
-                Ordering::Less => Style::default().fg(inactive).add_modifier(modifier),
-                Ordering::Equal => Style::default().fg(accent).bold(),
-                Ordering::Greater => Style::default().fg(upcoming).add_modifier(modifier)
+            let style = match active_idx {
+                Some(active_idx) => {
+                    match i.cmp(&active_idx) {
+                        Ordering::Less => Style::default().fg(inactive).add_modifier(modifier),
+                        Ordering::Equal => Style::default().fg(accent).bold(),
+                        Ordering::Greater => Style::default().fg(upcoming).add_modifier(modifier)
+                    }
+                },
+                None => Style::default().fg(upcoming).add_modifier(modifier)
             };
 
-            if i == active_idx {
+            if let Some(active_idx) = active_idx && active_idx == i {
                 text.insert_str(0, &self.config.lyric.active_prefix);
             }
 
