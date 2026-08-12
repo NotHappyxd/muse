@@ -67,6 +67,14 @@ impl App {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.active_song = None;
+        self.lyrics = None;
+        self.anchor_position = 0;
+        self.anchor_instant = None;
+        self.manual_scroll_offset.set(0);
+    }
+
     pub fn set_progress(&mut self, position: u128, is_playing: bool, at: Instant) {
         self.anchor_position = position;
         self.anchor_instant = if is_playing { Some(at) } else { None };

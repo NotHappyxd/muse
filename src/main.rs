@@ -14,7 +14,7 @@ use mpris::PlayerFinder;
 use ratatui::DefaultTerminal;
 use std::cell::Cell;
 use std::io::stdout;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
@@ -113,9 +113,15 @@ fn handle_event(event: AppEvent, app: &mut App) {
             position_ms,
             is_playing,
             at,
-        } => app.set_progress(position_ms, is_playing, at),
+        } => {
+            if app.active_song.is_some() {
+                app.set_progress(position_ms, is_playing, at);
+            }
+        },
 
-        AppEvent::PlayerDetached => {}
+        AppEvent::PlayerDetached => {
+            app.reset();
+        }
 
         AppEvent::Error { error: _error } => {
             panic!("{}", _error)
