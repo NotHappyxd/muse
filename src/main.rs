@@ -120,7 +120,7 @@ fn handle_event(event: AppEvent, app: &mut App) {
         }
 
         AppEvent::Error { error: _error } => {
-            panic!("{}", _error)
+            app.debug_text = Some(_error);
         }
 
         AppEvent::LyricsFetched { lyrics } => {

@@ -72,6 +72,7 @@ impl App {
     }
 
     fn handle_mouse_press(&mut self, mouse: MouseEvent) {
+        if self.debug_text.is_some() { return; }
         if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
             return;
         }

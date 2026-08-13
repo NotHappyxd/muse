@@ -50,16 +50,24 @@ impl App {
     }
 
     pub(crate) fn render_lyrics(&self, area: Rect, buf: &mut Buffer) {
-        let Some(active_song) = &self.active_song else {
-            return;
-        };
-
         let accent = self
             .theme
             .accent
             .map(Color::from)
             .unwrap_or(Color::from(self.config.color.fallback_accent_rgb()));
-
+        
+        if let Some(debug_msg) = &self.debug_text {
+            Text::from(debug_msg.clone())
+                .centered()
+                .style(Style::default().fg(accent))
+                .render(area, buf);
+            return;
+        }
+        
+        let Some(active_song) = &self.active_song else {
+            return;
+        };
+        
         let alignment = if self.config.lyric.center {
             Alignment::Center
         } else {

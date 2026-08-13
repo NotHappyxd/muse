@@ -28,6 +28,7 @@ pub struct App {
     pub tx: Option<UnboundedSender<AppEvent>>,
     pub config: Config,
     pub lyric_area: Option<Rect>,
+    pub debug_text: Option<String>
 }
 
 #[derive(Default, Debug)]
@@ -64,6 +65,7 @@ impl App {
             tx: None,
             config,
             lyric_area: None,
+            debug_text: None
         }
     }
 
@@ -73,6 +75,7 @@ impl App {
         self.anchor_position = 0;
         self.anchor_instant = None;
         self.manual_scroll_offset.set(0);
+        self.debug_text = None;
     }
 
     pub fn set_progress(&mut self, position: u128, is_playing: bool, at: Instant) {
