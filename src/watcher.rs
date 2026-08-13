@@ -49,9 +49,9 @@ const RETRY_COUNT: u8 = 3;
 
 #[derive(Default)]
 struct PlaybackAnchor {
-    anchor_position: Option<u128>,
-    anchor_instant: Option<Instant>,
-    anchor_playing: bool,
+    position: Option<u128>,
+    instant: Option<Instant>,
+    playing: bool,
     last_real_position: Option<u128>,
     last_change_instant: Option<Instant>,
     estimated_tick_rate: u128
@@ -144,7 +144,7 @@ fn handle_no_player(state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
 
     let anchor = &state.playback_anchor;
 
-    if anchor.anchor_instant.is_some() || anchor.anchor_playing {
+    if anchor.instant.is_some() || anchor.playing {
         let now = Instant::now();
         let estimated_position = anchor.predicted_position(now);
         state.playback_anchor.pause(estimated_position);
@@ -177,11 +177,11 @@ fn handle_active_player(
     }
 
 
-    let paused_before_sync = !state.playback_anchor.anchor_playing;
-    recode_sync_playback_drift(player, state, tx);
+    let paused_before_sync = !state.playback_anchor.playing;
+    sync_playback_drift(player, state, tx);
 
     let anchor = &state.playback_anchor;
-    let was_paused = anchor.anchor_playing && paused_before_sync;
+    let was_paused = anchor.playing && paused_before_sync;
 
     match player.get_metadata() {
         Err(e) => {
@@ -197,7 +197,7 @@ fn handle_active_player(
 const MAXIMUM_DRIFT_ALLOWED: u64 = 750;
 const DEFAULT_TICK_ESTIMATED_MS: u128 = POLL_MS as u128;
 
-fn recode_sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
+fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
     let now = Instant::now();
     let anchor = &mut state.playback_anchor;
     let Ok(reported_position) = player.get_position() else { return; };
@@ -216,7 +216,7 @@ fn recode_sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Un
         return;
     }
 
-    let is_new_session = !anchor.anchor_playing;
+    let is_new_session = !anchor.playing;
     if is_new_session { // Trust the result of a new session implicitly
         anchor.update(reported_ms, now, true, reported_ms);
         anchor.report(now, &tx);
@@ -377,33 +377,33 @@ impl SongInfo {
 
 impl PlaybackAnchor {
     fn update(&mut self, position: u128, now: Instant, is_playing: bool, last_real_position: u128) {
-        self.anchor_position = Some(position);
-        self.anchor_instant = Some(now);
-        self.anchor_playing = is_playing;
+        self.position = Some(position);
+        self.instant = Some(now);
+        self.playing = is_playing;
         self.last_change_instant = Some(now);
         self.last_real_position = Some(last_real_position);
     }
 
     fn pause(&mut self, position: u128) {
-        self.anchor_position = Some(position);
-        self.anchor_instant = None;
-        self.anchor_playing = false;
+        self.position = Some(position);
+        self.instant = None;
+        self.playing = false;
         self.last_real_position = None;
         self.last_change_instant = None;
     }
 
     fn report(&self, now: Instant, tx: &UnboundedSender<AppEvent>) {
-        if let Some(position) = self.anchor_position {
-            let _ = tx.send(AppEvent::PlaybackAnchor { position_ms: position, is_playing: self.anchor_playing, at: now });
+        if let Some(position) = self.position {
+            let _ = tx.send(AppEvent::PlaybackAnchor { position_ms: position, is_playing: self.playing, at: now });
         }
     }
 
     fn predicted_position(&self, now: Instant) -> u128 {
-        let Some(anchor_position) = self.anchor_position else {
+        let Some(anchor_position) = self.position else {
             return 0;
         };
 
-        if let (true, Some(anchor_at)) = (self.anchor_playing, self.anchor_instant) {
+        if let (true, Some(anchor_at)) = (self.playing, self.instant) {
             return anchor_position + now.saturating_duration_since(anchor_at).as_millis();
         }
 
