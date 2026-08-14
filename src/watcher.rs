@@ -221,14 +221,13 @@ fn sync_playback_drift(player: &Player, compensate_lag: bool, state: &mut Watche
         anchor.report(now, &tx);
         return;
     }
-    
+
     if !compensate_lag {
         anchor.update(reported_ms, now, true, reported_ms);
         anchor.report(now, &tx);
         return;
     }
 
-    println!("compensation algorithm");
     let predicted = anchor.predicted_position(now);
     let delta = predicted as i128 - reported_ms as i128;
     let is_seek = delta.abs() > MAXIMUM_DRIFT_ALLOWED as i128;
