@@ -84,12 +84,9 @@ fn run_ui(
 fn handle_event(event: AppEvent, app: &mut App) {
     match event {
         AppEvent::SongChanged {
-            title,
-            album,
-            artists,
-            length,
+            info
         } => {
-            let song = Song::new(title, album, artists, length);
+            let song = Song::new(info.title, info.album, info.artists, info.length);
 
             app.active_song = Some(song);
 

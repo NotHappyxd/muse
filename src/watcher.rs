@@ -13,10 +13,7 @@ pub enum AppEvent {
     PlayerDetached,
     Idle,
     SongChanged {
-        title: String,
-        album: String,
-        artists: Vec<String>,
-        length: u32,
+        info: SongInfo,
     },
     PlaybackAnchor {
         position_ms: u128,
@@ -65,12 +62,13 @@ struct WatcherState {
     playback_anchor: PlaybackAnchor
 }
 
-struct SongInfo {
-    title: String,
-    album: String,
-    artists: Vec<String>,
-    length: u32,
-    art_url: Option<String>,
+#[derive(Debug, Clone)]
+pub struct SongInfo {
+    pub title: String,
+    pub album: String,
+    pub artists: Vec<String>,
+    pub length: u32,
+    pub art_url: Option<String>,
 }
 
 pub async fn run_watcher(
@@ -216,13 +214,7 @@ fn sync_playback_drift(player: &Player, compensate_lag: bool, state: &mut Watche
     }
 
     let is_new_session = !anchor.playing;
-    if is_new_session { // Trust the result of a new session implicitly
-        anchor.update(reported_ms, now, true, reported_ms);
-        anchor.report(now, &tx);
-        return;
-    }
-
-    if !compensate_lag {
+    if is_new_session || !compensate_lag { // Trust the result of a new session implicitly
         anchor.update(reported_ms, now, true, reported_ms);
         anchor.report(now, &tx);
         return;
@@ -240,8 +232,8 @@ fn sync_playback_drift(player: &Player, compensate_lag: bool, state: &mut Watche
 
     let gap = now.saturating_duration_since(anchor.last_change_instant.unwrap_or(now)).as_millis();
 
-    const TICK_RATE_WEIGHT: u128 = 5;
-    const GAP_WEIGHT: u128 = 5;
+    const TICK_RATE_WEIGHT: u128 = 7;
+    const GAP_WEIGHT: u128 = 3;
     let clamped_gap = gap.clamp(POLL_MS as u128, 5_000);
 
     anchor.estimated_tick_rate = (anchor.estimated_tick_rate * TICK_RATE_WEIGHT + clamped_gap * GAP_WEIGHT) / 10;
@@ -284,13 +276,8 @@ fn handle_metadata(
     state.current_album = Some(song_info.album.clone());
     state.album_retry = 0;
 
-    let artists = song_info.artists.clone();
-
     let _ = tx.send(AppEvent::SongChanged {
-        title: song_info.title.clone(),
-        album: song_info.album.clone(),
-        artists,
-        length: song_info.length,
+        info: song_info.clone()
     });
 
     if let Some(art_url) = song_info.art_url {
