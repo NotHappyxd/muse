@@ -62,7 +62,7 @@ To clear the cache, delete this folder or remove individual song cache files.
 
 ## Planned Features
 - [ ] Support lyrics file format
-- [ ] Theme inactive lyric lines based off album art
+- [X] Theme inactive lyric lines based off album art
 - [ ] Support SMTC for Windows
 
 ## Acknowledgements
