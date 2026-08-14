@@ -5,10 +5,17 @@ use std::fs;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct Config {
-    pub player: String,
+    pub general: General,
     pub header: Header,
     pub color: Color,
     pub lyric: LyricSettings,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
+pub struct General {
+    pub player: String,
+    pub compensate_lag: bool
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -73,10 +80,19 @@ impl Default for Color {
     }
 }
 
+impl Default for General {
+    fn default() -> Self {
+        General {
+            player: "".to_owned(),
+            compensate_lag: true
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
-            player: String::from(""),
+            general: General::default(),
             header: Header::default(),
             color: Color::default(),
             lyric: LyricSettings::default(),

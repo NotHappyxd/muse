@@ -1,4 +1,3 @@
-use std::fmt::format;
 use crate::colorgen::generator::Theme;
 use crate::config;
 use crate::config::Config;
@@ -113,7 +112,7 @@ fn poll(tx: &UnboundedSender<AppEvent>, state: &mut WatcherState, config: &Confi
 
     let players_vec: Vec<_> = players
         .filter_map(Result::ok)
-        .filter(|player| player.bus_name().contains(&config.player))
+        .filter(|player| player.bus_name().contains(&config.general.player))
         .collect();
 
     let active = if players_vec.len() <= 1 {
@@ -178,7 +177,7 @@ fn handle_active_player(
 
 
     let paused_before_sync = !state.playback_anchor.playing;
-    sync_playback_drift(player, state, tx);
+    sync_playback_drift(player, config.general.compensate_lag, state, tx);
 
     let anchor = &state.playback_anchor;
     let was_paused = anchor.playing && paused_before_sync;
@@ -197,7 +196,7 @@ fn handle_active_player(
 const MAXIMUM_DRIFT_ALLOWED: u64 = 750;
 const DEFAULT_TICK_ESTIMATED_MS: u128 = POLL_MS as u128;
 
-fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
+fn sync_playback_drift(player: &Player, compensate_lag: bool, state: &mut WatcherState, tx: &UnboundedSender<AppEvent>) {
     let now = Instant::now();
     let anchor = &mut state.playback_anchor;
     let Ok(reported_position) = player.get_position() else { return; };
@@ -222,7 +221,14 @@ fn sync_playback_drift(player: &Player, state: &mut WatcherState, tx: &Unbounded
         anchor.report(now, &tx);
         return;
     }
+    
+    if !compensate_lag {
+        anchor.update(reported_ms, now, true, reported_ms);
+        anchor.report(now, &tx);
+        return;
+    }
 
+    println!("compensation algorithm");
     let predicted = anchor.predicted_position(now);
     let delta = predicted as i128 - reported_ms as i128;
     let is_seek = delta.abs() > MAXIMUM_DRIFT_ALLOWED as i128;
